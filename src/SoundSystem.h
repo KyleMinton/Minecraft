@@ -42,6 +42,11 @@ public:
     // now and then starts a music track (Beta's SoundManager.playRandomMusicIfReady).
     void Update(float dt);
 
+    // Which music fits now (1.21's MusicManager situations): the menu's starts within
+    // 1-30 seconds and cuts off game music; in a world, a menu track plays out, then
+    // the game's long gaps apply. Menu tracks come from music/menu/ if it exists.
+    void SetMenuMusic(bool menu);
+
     // The options menu's sliders, 0..1.
     void SetVolumes(float music, float sound);
 
@@ -59,6 +64,9 @@ private:
     bool musicPlaying = false;
     double ticksBeforeMusic = 0.0;   // Beta waits 0-10 minutes for the first track, 10-20 between tracks
     std::vector<std::string> musicTracks;
+    std::vector<std::string> menuTracks; // empty: the menu uses musicTracks
+    bool inMenu = false;
+    bool musicIsMenu = false;            // the playing track was started for the menu
 
     Music record = {};
     bool recordPlaying = false;

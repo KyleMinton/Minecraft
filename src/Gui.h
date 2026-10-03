@@ -86,6 +86,7 @@ public:
 private:
     static inline GuiBackdrop* instance = nullptr;
     Texture2D faces[6] = {};
+    Texture2D overlay = {}; // panorama_overlay.png: the shading laid over the spinning cube
     Shader blur = {};
     int blurDirectionLoc = -1, blurTexelLoc = -1, blurRadiusLoc = -1;
     RenderTexture2D scene = {}, pingA = {}, pingB = {};

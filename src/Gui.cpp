@@ -112,7 +112,10 @@ GuiBackdrop::GuiBackdrop() {
         SetTextureFilter(faces[i], TEXTURE_FILTER_BILINEAR);
         SetTextureWrap(faces[i], TEXTURE_WRAP_CLAMP);
     }
-    blur = LoadShader(nullptr, "resources/shaders/blur.fs");
+    overlay = LoadTexture("resources/textures/gui/modern/title/background/panorama_overlay.png");
+    SetTextureFilter(overlay, TEXTURE_FILTER_BILINEAR);
+    SetTextureWrap(overlay, TEXTURE_WRAP_CLAMP);
+    blur =LoadShader(nullptr, "resources/shaders/blur.fs");
     blurDirectionLoc = GetShaderLocation(blur, "direction");
     blurTexelLoc = GetShaderLocation(blur, "texel");
     blurRadiusLoc = GetShaderLocation(blur, "radius");
@@ -120,6 +123,7 @@ GuiBackdrop::GuiBackdrop() {
 
 GuiBackdrop::~GuiBackdrop() {
     for (Texture2D& t : faces) UnloadTexture(t);
+    if (overlay.id != 0) UnloadTexture(overlay);
     UnloadShader(blur);
     for (RenderTexture2D* t : { &scene, &pingA, &pingB }) {
         if (t->id != 0) UnloadRenderTexture(*t);
@@ -224,6 +228,11 @@ void GuiBackdrop::DrawPanorama(bool blurred) {
         rlEnableBackfaceCulling();
         rlEnableDepthTest();
         EndMode3D();
+        // PanoramaRenderer: the overlay stretched over the whole screen.
+        if (overlay.id != 0) {
+            DrawTexturePro(overlay, Rectangle{ 0, 0, (float)overlay.width, (float)overlay.height },
+                           Rectangle{ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() }, Vector2{ 0, 0 }, 0.0f, WHITE);
+        }
     };
     if (!blurred) {
         drawCube();

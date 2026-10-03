@@ -23,7 +23,28 @@ SoundSystem::SoundSystem() {
     FilePathList files = LoadDirectoryFilesEx("resources/sounds/music", ".ogg", false);
     for (unsigned int i = 0; i < files.count; i++) musicTracks.push_back(files.paths[i]);
     UnloadDirectoryFiles(files);
+    if (DirectoryExists("resources/sounds/music/menu")) {
+        files = LoadDirectoryFilesEx("resources/sounds/music/menu", ".ogg", false);
+        for (unsigned int i = 0; i < files.count; i++) menuTracks.push_back(files.paths[i]);
+        UnloadDirectoryFiles(files);
+    }
     ticksBeforeMusic = GetRandomValue(0, 11999);
+}
+
+void SoundSystem::SetMenuMusic(bool menu) {
+    if (menu == inMenu) return;
+    inMenu = menu;
+    if (menu) {
+        // Back to the menus: game music stops, and menu music comes soon.
+        if (musicPlaying && !musicIsMenu) {
+            StopMusicStream(music);
+            UnloadMusicStream(music);
+            musicPlaying = false;
+        }
+        ticksBeforeMusic = std::min(ticksBeforeMusic, (double)GetRandomValue(20, 600));
+    } else if (!musicPlaying) {
+        ticksBeforeMusic = GetRandomValue(0, 11999); // a new world waits like Beta's first track
+    }
 }
 
 SoundSystem::~SoundSystem() {
@@ -152,17 +173,20 @@ void SoundSystem::Update(float dt) {
         if (!IsMusicStreamPlaying(music)) {
             UnloadMusicStream(music);
             musicPlaying = false;
+            // The gap before the next: short in the menus, long in a world.
+            ticksBeforeMusic = inMenu ? GetRandomValue(20, 600) : GetRandomValue(12000, 23999);
         }
     } else if (musicVolume > 0.0f && !recordPlaying && !musicTracks.empty()) {
         ticksBeforeMusic -= dt * 20.0;
         if (ticksBeforeMusic <= 0.0) {
-            const std::string& track = musicTracks[GetRandomValue(0, (int)musicTracks.size() - 1)];
+            const std::vector<std::string>& tracks = inMenu && !menuTracks.empty() ? menuTracks : musicTracks;
+            const std::string& track = tracks[GetRandomValue(0, (int)tracks.size() - 1)];
             music = LoadMusicStream(track.c_str());
             music.looping = false;
             SetMusicVolume(music, musicVolume);
             PlayMusicStream(music);
             musicPlaying = true;
-            ticksBeforeMusic = GetRandomValue(12000, 23999);
+            musicIsMenu = inMenu;
         }
     }
 

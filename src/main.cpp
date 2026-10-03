@@ -221,6 +221,7 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
     bool quit = false;
     bool showOverlay = true; // the controls line and FPS; F3 toggles them
     while (!WindowShouldClose() && !quit) {
+        sounds.SetMenuMusic(!worldPtr); // title, world list and options away from a world
         sounds.Update(GetFrameTime());
         backdrop.Update(GetFrameTime());
         if (optionsScreen.IsOpen() && !worldPtr) {

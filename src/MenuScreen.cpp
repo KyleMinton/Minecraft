@@ -130,7 +130,11 @@ void MenuScreen::Draw() const {
     if (background == Background::Title) {
         if (GuiBackdrop::Get() != nullptr) GuiBackdrop::Get()->DrawPanorama(false);
         DrawTitleDecorations();
-        font.Draw("Minecraft Beta 1.8", 2 * s, (GetScreenHeight() / s - 10) * s, s, WHITE, true);
+        // TitleScreen's bottom corners: the version on the left, the copyright on the right.
+        int textY = (GetScreenHeight() / s - 10) * s;
+        font.Draw("Minecraft 1.21", 2 * s, textY, s, WHITE, true);
+        const char* copyright = "Copyright Mojang AB. Do not distribute!";
+        font.Draw(copyright, (GetScreenWidth() / s - font.Width(copyright) - 2) * s, textY, s, WHITE, true);
     }
 
     int guiWidth = (width + s - 1) / s;
