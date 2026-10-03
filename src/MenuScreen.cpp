@@ -104,7 +104,8 @@ void MenuScreen::DrawTitleDecorations() const {
     Texture2D logo = GuiModernTexture("title/minecraft");
     Texture2D edition = GuiModernTexture("title/edition");
     DrawGuiTexture(logo, Rectangle{ 0, 0, (float)logo.width, logo.height * 44.0f / 64.0f }, x, y, 256, 44, s);
-    DrawGuiTexture(edition, Rectangle{ 0, 0, edition.width * 98.0f / 128.0f, edition.height * 14.0f / 16.0f }, x + 79, y + 37, 98, 14, s);
+    // 1.21's LogoRenderer: the whole 128-wide edition banner (128x14 of 128x16), centered under the logo.
+    DrawGuiTexture(edition, Rectangle{ 0, 0, (float)edition.width, edition.height * 14.0f / 16.0f }, x + 64, y + 37, 128, 14, s);
     if (splash.empty()) return;
     float pulse = 1.8f - fabsf(sinf((float)fmod(GetTime(), 1.0) * PI * 2.0f) * 0.1f);
     float scale = pulse * 100.0f / (font.Width(splash.c_str()) + 32);
