@@ -93,8 +93,6 @@ public:
 class RedstoneTorchBlock final : public TorchBlock {
 public:
     bool active = false;
-    struct Toggle { int x, y, z; long long time; };
-    static std::deque<Toggle>& Toggles() { static std::deque<Toggle> toggles; return toggles; }
 
     RedstoneTorchBlock() { tickRate = 2; ticksRandomly = false; }
     bool CanProvidePower() const override { return true; }
@@ -129,17 +127,17 @@ public:
         return meta == 2 && world.IsBlockIndirectlyProvidingPowerTo(x + 1, y, z, 5);
     }
     bool BurnedOut(World& world, int x, int y, int z, bool record) const {
-        auto& toggles = Toggles();
+        auto& toggles = world.TorchToggles();
         if (record) toggles.push_back({ x, y, z, world.GetTickCount() });
         int count = 0;
-        for (const Toggle& t : toggles) {
+        for (const World::TorchToggle& t : toggles) {
             if (t.x == x && t.y == y && t.z == z && ++count >= 8) return true;
         }
         return false;
     }
     void OnTick(World& world, int x, int y, int z, JavaRandom& random) const override {
         bool powered = AttachedPowered(world, x, y, z);
-        auto& toggles = Toggles();
+        auto& toggles = world.TorchToggles();
         while (!toggles.empty() && world.GetTickCount() - toggles.front().time > 100) toggles.pop_front();
         int meta = world.GetMeta(x, y, z);
         if (active) {

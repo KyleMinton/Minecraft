@@ -32,6 +32,10 @@ public:
     static constexpr int SIZE = 16;    // horizontal extent (X and Z)
     static constexpr int HEIGHT = 64;  // vertical extent (Y)
     static constexpr int SEA_LEVEL = 32;
+    // Saves only keep edited blocks and regenerate the rest from the seed, so any
+    // change to what the generator makes changes existing worlds. Bump this with
+    // any such change; level.dat records the version each world was made with.
+    static constexpr int GENERATOR_VERSION = 1;
 
     // Generates the chunk's terrain for the given world seed.
     Chunk(int chunkX, int chunkZ, int64_t seed);

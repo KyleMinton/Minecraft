@@ -63,6 +63,7 @@ std::string LevelText(const WorldInfo& info) {
     out << "gamemode " << (info.gameMode == GameMode::Creative ? 1 : 0) << "\n";
     out << "time " << info.time << "\n";
     out << "lastplayed " << info.lastPlayed << "\n";
+    out << "generator " << info.generatorVersion << "\n";
     return out.str();
 }
 
@@ -71,6 +72,7 @@ bool ReadLevel(const fs::path& folder, WorldInfo& info) {
     if (!in) return false;
     info.folder = folder.filename().string();
     info.name = info.folder;
+    info.generatorVersion = 1; // worlds saved before the version was recorded
     std::string line;
     while (std::getline(in, line)) {
         std::istringstream fields(line);
@@ -88,6 +90,8 @@ bool ReadLevel(const fs::path& folder, WorldInfo& info) {
             fields >> info.time;
         } else if (key == "lastplayed") {
             fields >> info.lastPlayed;
+        } else if (key == "generator") {
+            fields >> info.generatorVersion;
         }
     }
     return true;

@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "World.h"
 
+#include <deque>
 #include <vector>
 
 // Beta's particles: chips of a block's texture that fly off while you mine it
@@ -54,7 +55,7 @@ private:
         bool noClip = false;
     };
 
-    std::vector<Particle> particles;
+    std::deque<Particle> particles; // oldest first; the oldest goes when it's full
     double tickAccumulator = 0.0;
     float alpha = 0.0f;
     float skyDarken = 0.0f;

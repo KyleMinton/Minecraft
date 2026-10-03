@@ -129,7 +129,8 @@ public:
     int SleepTimer() const { return sleepTimer; }
     // Beds: once asleep for long enough, the night is skipped (main does that) and you wake.
     bool SleptThroughNight() const { return sleeping && sleepTimer >= 100; }
-    void WakeUp(World& world);
+    // Stands up beside the bed; with `setSpawn` (not when woken by damage) it becomes the spawn point.
+    void WakeUp(World& world, bool setSpawn = true);
     void SetSpawnPoint(Vector3 point) { spawnPoint = point; }
 
     // ---- Settings from the options menu

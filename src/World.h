@@ -115,6 +115,10 @@ public:
     // A block event (pistons moving, note blocks playing), delivered at once.
     void BlockEvent(int x, int y, int z, int a, int b);
     JavaRandom& Random() { return random; }
+    // Recent redstone torch toggles, for burning out (BlockRedstoneTorch.torchUpdates).
+    // Kept per world: world tick counts restart at 0 each time one is opened.
+    struct TorchToggle { int x, y, z; long long time; };
+    std::deque<TorchToggle>& TorchToggles() { return torchToggles; }
 
     // ---- Light
     int GetSkyLight(int x, int y, int z) const;
@@ -206,7 +210,11 @@ private:
     mutable Chunk* cachedChunk = nullptr;
     int ambientCountdown = 0;
     std::set<ScheduledTick> scheduled;
-    std::unordered_set<uint64_t> scheduledKeys;
+    // Every pending (block position, block ID), scheduled or deferred, so a block isn't scheduled twice.
+    std::set<std::pair<int64_t, int>> scheduledKeys;
+    // Ticks that came due while their chunk was unloaded, by chunk key; they run once it's back.
+    std::unordered_map<int64_t, std::vector<ScheduledTick>> deferredTicks;
+    std::deque<TorchToggle> torchToggles;
     long long tickOrder = 0;
     long long tickCount = 0;
     double tickAccumulator = 0.0;
@@ -217,6 +225,7 @@ private:
     Texture2D atlasTexture;
     bool hasTexture;
     Shader chunkShader;
+    int fogColorLoc, fogStartLoc, fogEndLoc, fogDensityLoc, skyDarkenLoc, cameraPosLoc, translucentPassLoc;
     bool hasStreamed;
     int lastPlayerChunkX;
     int lastPlayerChunkZ;
@@ -238,7 +247,7 @@ private:
     std::unordered_set<int64_t> requested; // queued or being generated
 
     static int64_t Key(int cx, int cz);
-    static uint64_t TickKey(int x, int y, int z, int id);
+    static std::pair<int64_t, int> TickKey(int x, int y, int z, int id);
     void MarkLightDirty(int x, int z);
     void UnloadChunkModels(LoadedChunk& loaded);
     void PlayCaveAmbience();
@@ -272,4 +281,6 @@ private:
     void Relight(int x, int y, int z);
     void LightAcrossBorders(int cx, int cz);
     float BlockDensity(Vector3 from, const double min[3], const double max[3]) const;
+    // Which loaded chunks the current 3D camera can see (call inside BeginMode3D).
+    std::vector<const LoadedChunk*> VisibleChunks(bool translucent) const;
 };

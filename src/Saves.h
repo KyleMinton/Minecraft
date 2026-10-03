@@ -22,6 +22,7 @@ struct WorldInfo {
     GameMode gameMode = GameMode::Survival;
     long long lastPlayed = 0; // Unix time, seconds
     long long time = 0;       // world ticks
+    int generatorVersion = Chunk::GENERATOR_VERSION; // terrain generator it was created with
 };
 
 namespace Saves {

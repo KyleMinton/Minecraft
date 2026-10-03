@@ -43,12 +43,10 @@ MenuScreen::MenuScreen(const GuiFont& guiFont, std::string menuTitle, std::vecto
         std::string all = text, line;
         UnloadFileText(text);
         for (char c : all) {
-            if (c == '
-') {
+            if (c == '\n') {
                 if (!line.empty()) lines.push_back(line);
                 line.clear();
-            } else if (c != '
-') {
+            } else if (c != '\r') {
                 line += c;
             }
         }

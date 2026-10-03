@@ -79,7 +79,7 @@ BlockParticles::Particle BlockParticles::MakeDigging(const World& world, double 
 }
 
 void BlockParticles::Add(const Particle& particle) {
-    if (particles.size() >= MAX_PARTICLES) particles.erase(particles.begin());
+    if (particles.size() >= MAX_PARTICLES) particles.pop_front();
     particles.push_back(particle);
 }
 

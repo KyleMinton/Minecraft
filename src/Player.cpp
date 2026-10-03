@@ -340,7 +340,9 @@ void Player::Hurt(float amount) {
 void Player::Damage(float amount, bool armor) {
     if (gameMode == GameMode::Creative || health <= 0.0f || sleeping) {
         if (sleeping && gameMode != GameMode::Creative) {
-            sleeping = false;
+            // Hurt in bed: get up beside it rather than staying at bed height.
+            if (worldRef != nullptr) WakeUp(*worldRef, false);
+            else sleeping = false;
         } else {
             return;
         }
@@ -543,7 +545,7 @@ void Player::TrySleep(int x, int y, int z, int direction) {
 
 // Wakes up standing beside the bed (BlockBed.getNearestEmptyChunkCoordinates),
 // which also becomes the spawn point.
-void Player::WakeUp(World& world) {
+void Player::WakeUp(World& world, bool setSpawn) {
     if (!sleeping) return;
     sleeping = false;
     sleepTimer = 0;
@@ -567,6 +569,7 @@ void Player::WakeUp(World& world) {
         posZ = bedZ + 0.5;
     }
     prevX = posX; prevY = posY; prevZ = posZ;
+    if (!setSpawn) return;
     spawnPoint = Vector3{ (float)posX, (float)posY, (float)posZ };
     ShowMessage("Respawn point set");
 }
@@ -588,6 +591,8 @@ void Player::UpdateLook() {
 void Player::Update(World& world, float dt, SoundSystem& sounds) {
     worldRef = &world;
     UpdateLook();
+    // Checked every frame: most frames run no tick, so a press there would be missed.
+    if (sleeping && controlsEnabled && IsKeyPressed(KEY_LEFT_SHIFT)) WakeUp(world);
 
     tickAccumulator += dt;
     int ticks = 0;
@@ -617,7 +622,14 @@ void Player::Tick(World& world, SoundSystem& sounds) {
 
     if (sleeping) {
         sleepTimer = std::min(sleepTimer + 1, 100);
-        if (controlsEnabled && IsKeyPressed(KEY_LEFT_SHIFT)) WakeUp(world);
+        TickHand();
+        return;
+    }
+
+    // Like Minecraft, nothing moves in a chunk that isn't there yet (after
+    // respawning far away, say), so the player can't fall into ungenerated terrain.
+    if (!world.IsLoaded((int)floor(posX), (int)floor(posZ))) {
+        motionX = motionY = motionZ = 0.0;
         TickHand();
         return;
     }

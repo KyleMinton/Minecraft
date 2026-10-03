@@ -167,6 +167,10 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
         EndDrawing();
 
         currentWorld = info;
+        if (info.generatorVersion != Chunk::GENERATOR_VERSION) {
+            TraceLog(LOG_WARNING, "World '%s' was made with terrain generator %d, this is %d: unedited terrain may differ from before",
+                     info.folder.c_str(), info.generatorVersion, Chunk::GENERATOR_VERSION);
+        }
         worldPtr = std::make_unique<World>(info.seed);
         worldPtr->SetTexture(atlasTexture, hasTexture);
         worldPtr->LoadEdits(Saves::EditsPath(info));
@@ -215,6 +219,7 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
     SetExitKey(KEY_NULL); // Esc opens the menu or closes the inventory; handled below
 
     bool quit = false;
+    bool showOverlay = true; // the controls line and FPS; F3 toggles them
     while (!WindowShouldClose() && !quit) {
         sounds.Update(GetFrameTime());
         backdrop.Update(GetFrameTime());
@@ -295,6 +300,7 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
             player.SetControlsEnabled(false);
             EnableCursor();
         } else {
+            if (IsKeyPressed(KEY_F3)) showOverlay = !showOverlay;
             if (IsKeyPressed(KEY_C)) player.SetGameMode(GameMode::Creative);
             if (IsKeyPressed(KEY_V)) player.SetGameMode(GameMode::Survival);
         }
@@ -423,9 +429,13 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
             if (optionsScreen.IsOpen()) optionsScreen.Draw(options);
             else pauseMenu.Draw();
 
-            DrawText("WASD move, SPACE jump, double-tap W sprint, SHIFT sneak, LMB mine, RMB use/place, 1-9 select, E inventory, Q drop, MMB pick, C creative, V survival, ESC menu",
-                     20, 20, 20, DARKGRAY);
-            DrawFPS(20, GetScreenHeight() - 30);
+            // Only over the game itself, not over menus and screens.
+            bool anyScreen = pauseMenu.IsOpen() || optionsScreen.IsOpen() || inventoryScreen.IsOpen() || signScreen.IsOpen();
+            if (showOverlay && !anyScreen) {
+                DrawText("WASD move, SPACE jump, double-tap W sprint, SHIFT sneak, LMB mine, RMB use/place, 1-9 select, E inventory, Q drop, MMB pick, C creative, V survival, ESC menu, F3 hide this",
+                         20, 20, 20, DARKGRAY);
+                DrawFPS(20, GetScreenHeight() - 30);
+            }
         EndDrawing();
     }
 
@@ -451,6 +461,16 @@ extern "C" __declspec(dllexport) int RaylibAppMain() {
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, "Minecraft");
+    // On a screen too small for 1920x1080, shrink to 85% of it (same shape) and center.
+    int monitor = GetCurrentMonitor();
+    int monitorWidth = GetMonitorWidth(monitor), monitorHeight = GetMonitorHeight(monitor);
+    if (monitorWidth > 0 && monitorHeight > 0 && (screenWidth > monitorWidth * 0.9f || screenHeight > monitorHeight * 0.9f)) {
+        float scale = std::min(monitorWidth * 0.85f / screenWidth, monitorHeight * 0.85f / screenHeight);
+        int width = (int)(screenWidth * scale), height = (int)(screenHeight * scale);
+        SetWindowSize(width, height);
+        Vector2 origin = GetMonitorPosition(monitor);
+        SetWindowPosition((int)origin.x + (monitorWidth - width) / 2, (int)origin.y + (monitorHeight - height) / 2);
+    }
     InitAudioDevice();
     SetTargetFPS(0);
 

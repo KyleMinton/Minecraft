@@ -8,6 +8,7 @@
 #include "SoundSystem.h"
 
 #include "raymath.h"
+#include "rlgl.h"
 
 #include <algorithm>
 #include <chrono>
@@ -62,6 +63,13 @@ World::World(int64_t worldSeed)
     chunkShader = LoadShader("resources/shaders/chunk.vs", "resources/shaders/chunk.fs");
     float tileSize = 1.0f / ATLAS_TILES;
     SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "tileSize"), &tileSize, SHADER_UNIFORM_FLOAT);
+    fogColorLoc = GetShaderLocation(chunkShader, "fogColor");
+    fogStartLoc = GetShaderLocation(chunkShader, "fogStart");
+    fogEndLoc = GetShaderLocation(chunkShader, "fogEnd");
+    fogDensityLoc = GetShaderLocation(chunkShader, "fogDensity");
+    skyDarkenLoc = GetShaderLocation(chunkShader, "skyDarken");
+    cameraPosLoc = GetShaderLocation(chunkShader, "cameraPos");
+    translucentPassLoc = GetShaderLocation(chunkShader, "translucentPass");
     ambientCountdown = random.NextInt(12000);
 
     // Leave a core free for the main thread.
@@ -104,8 +112,8 @@ int World::TileX(int64_t key) { return SignExtend26(key >> 38); }
 int World::TileZ(int64_t key) { return SignExtend26(key >> 12); }
 int World::TileY(int64_t key) { return (int)(key & 0xFFF); }
 
-uint64_t World::TickKey(int x, int y, int z, int id) {
-    return ((uint64_t)TileKey(x, y, z) * 31u) ^ ((uint64_t)id << 56);
+std::pair<int64_t, int> World::TickKey(int x, int y, int z, int id) {
+    return { TileKey(x, y, z), id };
 }
 
 // Floor division, so negative world coordinates map to the right chunk.
@@ -214,6 +222,9 @@ void World::SaveTileEntities(std::ostream& out) const {
     }
     for (const ScheduledTick& t : scheduled) {
         out << "tick " << t.x << ' ' << t.y << ' ' << t.z << ' ' << t.id << ' ' << std::max(0LL, t.time - tickCount) << '\n';
+    }
+    for (const auto& [key, ticks] : deferredTicks) {
+        for (const ScheduledTick& t : ticks) out << "tick " << t.x << ' ' << t.y << ' ' << t.z << ' ' << t.id << " 0\n";
     }
 }
 
@@ -358,6 +369,17 @@ void World::IntegrateFinished(int pcx, int pcz) {
         cachedKey = INT64_MIN;
         cachedChunk = nullptr;
         LightAcrossBorders(cx, cz);
+
+        // Block updates that came due while it was away (flowing water, redstone) carry on.
+        auto deferred = deferredTicks.find(key);
+        if (deferred != deferredTicks.end()) {
+            for (ScheduledTick t : deferred->second) {
+                t.time = tickCount + 1;
+                t.order = tickOrder++;
+                scheduled.insert(t);
+            }
+            deferredTicks.erase(deferred);
+        }
     }
 }
 
@@ -584,9 +606,7 @@ void World::MarkLightDirty(int x, int z) {
 // ---- Ticks
 
 void World::ScheduleTick(int x, int y, int z, int id, int delay) {
-    uint64_t key = TickKey(x, y, z, id);
-    if (scheduledKeys.count(key)) return;
-    scheduledKeys.insert(key);
+    if (!scheduledKeys.insert(TickKey(x, y, z, id)).second) return; // already pending
     scheduled.insert(ScheduledTick{ tickCount + delay, tickOrder++, x, y, z, id });
 }
 
@@ -610,8 +630,12 @@ void World::TickScheduled() {
         ScheduledTick t = *scheduled.begin();
         if (t.time > tickCount) break;
         scheduled.erase(scheduled.begin());
+        if (!IsLoaded(t.x, t.z)) {
+            // Hold it (still pending) until the chunk comes back.
+            deferredTicks[Key(ChunkCoord(t.x), ChunkCoord(t.z))].push_back(t);
+            continue;
+        }
         scheduledKeys.erase(TickKey(t.x, t.y, t.z, t.id));
-        if (!IsLoaded(t.x, t.z)) continue;
         uint8_t id = GetBlock(t.x, t.y, t.z);
         if (id == t.id && id != BLOCK_AIR) GetBlockDef(id).OnTick(*this, t.x, t.y, t.z, random);
     }
@@ -1150,35 +1174,67 @@ bool World::EntitiesInBox(const double min[3], const double max[3], bool livingO
 // ---- Drawing
 
 void World::SetFog(Vector3 color, float start, float end, float density, float darken, Vector3 cameraPos) {
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "fogColor"), &color, SHADER_UNIFORM_VEC3);
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "fogStart"), &start, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "fogEnd"), &end, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "fogDensity"), &density, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "skyDarken"), &darken, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "cameraPos"), &cameraPos, SHADER_UNIFORM_VEC3);
+    SetShaderValue(chunkShader, fogColorLoc, &color, SHADER_UNIFORM_VEC3);
+    SetShaderValue(chunkShader, fogStartLoc, &start, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(chunkShader, fogEndLoc, &end, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(chunkShader, fogDensityLoc, &density, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(chunkShader, skyDarkenLoc, &darken, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(chunkShader, cameraPosLoc, &cameraPos, SHADER_UNIFORM_VEC3);
+}
+
+// Frustum culling: the planes of the current view-projection matrix (Gribb and
+// Hartmann), each chunk's box tested against them. The far plane is left out;
+// render distance and fog already bound how far chunks reach.
+std::vector<const World::LoadedChunk*> World::VisibleChunks(bool translucent) const {
+    Matrix m = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    // Rows of the matrix as raylib applies it (x' = m0 x + m4 y + m8 z + m12).
+    const float r0[4] = { m.m0, m.m4, m.m8, m.m12 }, r1[4] = { m.m1, m.m5, m.m9, m.m13 };
+    const float r2[4] = { m.m2, m.m6, m.m10, m.m14 }, r3[4] = { m.m3, m.m7, m.m11, m.m15 };
+    float planes[5][4];
+    for (int i = 0; i < 4; i++) {
+        planes[0][i] = r3[i] + r0[i]; // left
+        planes[1][i] = r3[i] - r0[i]; // right
+        planes[2][i] = r3[i] + r1[i]; // bottom
+        planes[3][i] = r3[i] - r1[i]; // top
+        planes[4][i] = r3[i] + r2[i]; // near
+    }
+
+    std::vector<const LoadedChunk*> visible;
+    for (const auto& [key, loaded] : chunks) {
+        if (!(translucent ? loaded.hasTranslucent : loaded.hasOpaque)) continue;
+        float x0 = (float)(loaded.chunk->GetChunkX() * Chunk::SIZE), z0 = (float)(loaded.chunk->GetChunkZ() * Chunk::SIZE);
+        const float mn[3] = { x0, 0.0f, z0 }, mx[3] = { x0 + Chunk::SIZE, (float)Chunk::HEIGHT, z0 + Chunk::SIZE };
+        bool inside = true;
+        for (const auto& p : planes) {
+            // The box corner furthest along the plane's normal; if even that is behind it, the box is out.
+            float d = p[3];
+            for (int a = 0; a < 3; a++) d += p[a] * (p[a] >= 0.0f ? mx[a] : mn[a]);
+            if (d < 0.0f) { inside = false; break; }
+        }
+        if (inside) visible.push_back(&loaded);
+    }
+    return visible;
 }
 
 void World::Draw() const {
     float pass = 0.0f;
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "translucentPass"), &pass, SHADER_UNIFORM_FLOAT);
-    for (const auto& [key, loaded] : chunks) {
-        if (!loaded.hasOpaque) continue;
-        Vector3 origin = { (float)(loaded.chunk->GetChunkX() * Chunk::SIZE), 0.0f, (float)(loaded.chunk->GetChunkZ() * Chunk::SIZE) };
-        DrawModel(loaded.opaque, origin, 1.0f, WHITE);
+    SetShaderValue(chunkShader, translucentPassLoc, &pass, SHADER_UNIFORM_FLOAT);
+    for (const LoadedChunk* loaded : VisibleChunks(false)) {
+        Vector3 origin = { (float)(loaded->chunk->GetChunkX() * Chunk::SIZE), 0.0f, (float)(loaded->chunk->GetChunkZ() * Chunk::SIZE) };
+        DrawModel(loaded->opaque, origin, 1.0f, WHITE);
     }
 }
 
 void World::DrawTranslucent(Vector3 cameraPos) const {
     std::vector<std::pair<float, const LoadedChunk*>> order;
-    for (const auto& [key, loaded] : chunks) {
-        if (!loaded.hasTranslucent) continue;
-        float cx = loaded.chunk->GetChunkX() * Chunk::SIZE + 8.0f - cameraPos.x;
-        float cz = loaded.chunk->GetChunkZ() * Chunk::SIZE + 8.0f - cameraPos.z;
-        order.emplace_back(cx * cx + cz * cz, &loaded);
+    for (const LoadedChunk* loaded : VisibleChunks(true)) {
+        float cx = loaded->chunk->GetChunkX() * Chunk::SIZE + 8.0f - cameraPos.x;
+        float cz = loaded->chunk->GetChunkZ() * Chunk::SIZE + 8.0f - cameraPos.z;
+        order.emplace_back(cx * cx + cz * cz, loaded);
     }
     std::sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
     float pass = 1.0f;
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "translucentPass"), &pass, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(chunkShader, translucentPassLoc, &pass, SHADER_UNIFORM_FLOAT);
     BeginBlendMode(BLEND_ALPHA);
     for (const auto& [dist, loaded] : order) {
         Vector3 origin = { (float)(loaded->chunk->GetChunkX() * Chunk::SIZE), 0.0f, (float)(loaded->chunk->GetChunkZ() * Chunk::SIZE) };
@@ -1186,5 +1242,5 @@ void World::DrawTranslucent(Vector3 cameraPos) const {
     }
     EndBlendMode();
     pass = 0.0f;
-    SetShaderValue(chunkShader, GetShaderLocation(chunkShader, "translucentPass"), &pass, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(chunkShader, translucentPassLoc, &pass, SHADER_UNIFORM_FLOAT);
 }
