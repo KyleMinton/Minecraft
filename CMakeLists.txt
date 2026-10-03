@@ -46,6 +46,12 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 
+# Rebuilds resources/textures from Minecraft 1.21's assets; not part of the game build.
+#   cmake --build build --config Release --target ModernTextures
+#   build/Release/ModernTextures.exe <.minecraft/versions/1.21/1.21/assets/minecraft> resources
+add_executable(ModernTextures EXCLUDE_FROM_ALL tools/ModernTextures.cpp)
+target_link_libraries(ModernTextures PRIVATE raylib)
+
 # "cmake --install build --config Release --component Game" (as administrator) puts the game in C:/Program Files/RaylibApp:
 # RaylibApp.exe, RaylibGame.dll and resources/.
 install(TARGETS ${PROJECT_NAME} RaylibGame RUNTIME DESTINATION . COMPONENT Game)

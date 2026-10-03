@@ -104,7 +104,8 @@ class LogBlock final : public CubeBlock {
 public:
     std::string DisplayName(int meta) const override { return "Wood"; }
     int Texture(int side, int meta) const override {
-        if (side == SIDE_UP || side == SIDE_DOWN) return 21;
+        // Spruce and birch end grain: 1.21's own, in tiles Beta left empty (213, 214).
+        if (side == SIDE_UP || side == SIDE_DOWN) return meta == 1 ? 213 : meta == 2 ? 214 : 21;
         if (meta == 1) return 116;
         if (meta == 2) return 117;
         return 20;
@@ -132,7 +133,8 @@ public:
         SetNotCube(*this, Shape::Cube, Layer::Cutout, 1);
         normalCube = true; // leaves are solid for suffocation and redstone
     }
-    int Texture(int side, int meta) const override { return (meta & 3) == 1 ? 132 : 52; }
+    // Birch has its own leaves texture in 1.21 (tile 212); Beta tinted oak's.
+    int Texture(int side, int meta) const override { return (meta & 3) == 1 ? 132 : (meta & 3) == 2 ? 212 : 52; }
     Color ItemTint(int meta) const override {
         if ((meta & 3) == 1) return SPRUCE_LEAVES_COLOR;
         if ((meta & 3) == 2) return BIRCH_LEAVES_COLOR;

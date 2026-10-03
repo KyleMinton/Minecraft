@@ -92,10 +92,30 @@ worlds from an old `saves/` folder in the directory it was started from.
 
 Settings from the Options menu are saved in `%APPDATA%\RaylibApp\options.txt`.
 
+## Textures
+
+The textures in `resources/textures` are Minecraft 1.21's, laid out the way the
+game reads them (Beta-style `terrain.png`, `items.png` and `particles.png`
+atlases). `tools/ModernTextures.cpp` builds them from an unpacked 1.21 jar,
+and copies the title panorama from the launcher's downloaded assets. To rebuild
+them (for example after changing which tile a block uses):
+
+```bash
+cmake --build build --config Release --target ModernTextures
+```
+
+```bash
+./build/Release/ModernTextures.exe "C:/Users/<you>/AppData/Roaming/.minecraft/versions/1.21/1.21/assets/minecraft" resources
+```
+
+Water, lava, fire and portal animate from the strips in `resources/textures/animated`.
+Menu music plays from `resources/sounds/music/menu`.
+
 ## Project layout
 
 ```
 CMakeLists.txt     build and install rules
+tools/             ModernTextures, which rebuilds resources/textures from 1.21
 src/               game source (src/Launcher.cpp is the exe; everything else is the DLL)
 resources/         textures, sounds and shaders the game loads at runtime
 build/             created by CMake; safe to delete

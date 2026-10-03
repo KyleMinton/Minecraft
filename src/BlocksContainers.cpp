@@ -358,5 +358,5 @@ void RegisterContainerBlocks(BlockRegistry& r) {
     Props(r.Add<DispenserBlock>(BLOCK_DISPENSER), "Dispenser", 45, 3.5f, BlockMaterial::Rock, StepSound::Stone);
     Props(r.Add<CraftingTableBlock>(BLOCK_CRAFTING_TABLE), "Crafting Table", 59, 2.5f, BlockMaterial::Wood, StepSound::Wood);
     { auto& b = Props(r.Add<JukeboxBlock>(BLOCK_JUKEBOX), "Jukebox", 74, 2.0f, BlockMaterial::Wood, StepSound::Stone); SetResistance(b, 10); }
-    Props(r.Add<NoteBlockBlock>(BLOCK_NOTE_BLOCK), "Note Block", 74, 0.8f, BlockMaterial::Wood, StepSound::Wood);
+    Props(r.Add<NoteBlockBlock>(BLOCK_NOTE_BLOCK), "Note Block", 211, 0.8f, BlockMaterial::Wood, StepSound::Wood);
 }
