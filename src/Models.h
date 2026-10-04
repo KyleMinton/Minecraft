@@ -84,6 +84,6 @@ public:
 private:
     Texture2D atlas;
     Texture2D items;
-    mutable std::map<int, Mesh> blockMeshes; // id | meta << 8
-    mutable std::map<int, Mesh> flatMeshes;  // id | damage << 12
+    mutable std::map<int, Mesh> blockMeshes; // id | meta << 16
+    mutable std::map<int, Mesh> flatMeshes;  // id | damage << 16
 };

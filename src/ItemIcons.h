@@ -39,6 +39,6 @@ private:
     const ItemModels& models;
     Shader shader;
     int iconScale = 0;
-    mutable std::map<int, RenderTexture2D> icons; // id | meta << 8
+    mutable std::map<int, RenderTexture2D> icons; // id | meta << 16
     mutable std::set<int> pending;
 };

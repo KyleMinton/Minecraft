@@ -11,6 +11,7 @@
 // GUI, font, sky, sign, skin and break textures across as they are.
 
 #include "raylib.h"
+#include "ModernBlocks.h" // MODERN_TEXTURES: the tiles from 256 on
 
 #include <algorithm>
 #include <cstdio>
@@ -351,6 +352,18 @@ void BuildTerrain() {
         terrain.Put(135, head);
         terrain.Put(134, foot);
         UnloadImage(bed);
+    }
+
+    // Blocks from after Beta: their textures from tile 256 on, in the order
+    // ModernBlocksData.h lists them (BlocksModern.cpp finds them by the same list).
+    for (size_t i = 0; i < sizeof(MODERN_TEXTURES) / sizeof(MODERN_TEXTURES[0]); i++) {
+        Image texture = Asset(MODERN_TEXTURES[i]);
+        if (texture.data != nullptr && texture.height > texture.width) {
+            Image frame = FirstFrame(texture); // animated (sea lantern, prismarine, crimson stems)
+            UnloadImage(texture);
+            texture = frame;
+        }
+        terrain.Put(LEGACY_TILES + (int)i, texture);
     }
 
     // The block-breaking cracks (BreakOverlay reads tiles 240-249).

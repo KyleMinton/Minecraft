@@ -309,7 +309,7 @@ void DroppedItems::SetFog(Vector3 color, float start, float end, float density, 
 
 // A flat item's camera-facing quad: 1 wide, from 0.25 below its middle to 0.75 above.
 const Mesh& DroppedItems::Sprite(const ItemStack& stack) const {
-    int key = stack.id | (int)stack.damage << 12;
+    int key = stack.id | (stack.damage & 0x7FFF) << 16;
     auto it = sprites.find(key);
     if (it != sprites.end()) return it->second;
     Rectangle uv = models.IconUV(stack);

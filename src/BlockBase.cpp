@@ -97,7 +97,7 @@ bool Block::ShouldSideBeRendered(const World& world, int nx, int ny, int nz, int
 bool Block::RendersAs3DItem() const {
     switch (shape) {
         case Shape::Cube: case Shape::Cactus: case Shape::Stairs: case Shape::Fence:
-        case Shape::PistonBase: case Shape::Chest:
+        case Shape::PistonBase: case Shape::Chest: case Shape::Wall:
             return true;
         default:
             return false;
@@ -158,6 +158,7 @@ struct Tables {
         RegisterContainerBlocks(registry);
         RegisterPistonBlocks(registry);
         RegisterStairs(registry);
+        RegisterModernBlocks(registry);
         for (int id = 0; id < MAX_BLOCK_ID; id++) {
             const Block* block = registry.blocks[id].get();
             if (block == nullptr) block = registry.blocks[BLOCK_AIR].get();
@@ -181,6 +182,27 @@ const Block& GetBlockDef(BlockId id) {
     const Tables& t = GetTables();
     const Block* block = id < MAX_BLOCK_ID ? t.registry.blocks[id].get() : nullptr;
     return block != nullptr ? *block : *t.registry.blocks[BLOCK_AIR];
+}
+
+bool FenceJoins(BlockId id) {
+    Shape s = GetBlockDef(id).shape;
+    return s == Shape::Fence || s == Shape::FenceGate || BlockIsOpaqueCube(id);
+}
+
+bool WallJoins(BlockId id) {
+    Shape s = GetBlockDef(id).shape;
+    return s == Shape::Wall || s == Shape::FenceGate || s == Shape::Pane || BlockIsOpaqueCube(id);
+}
+
+bool PaneJoins(BlockId id) {
+    const Block& def = GetBlockDef(id);
+    bool glassCube = def.shape == Shape::Cube && def.material == BlockMaterial::Glass; // glass, stained glass
+    return def.shape == Shape::Pane || def.shape == Shape::Wall || glassCube || BlockIsOpaqueCube(id);
+}
+
+bool IsTallPost(BlockId id) {
+    Shape s = GetBlockDef(id).shape;
+    return s == Shape::Fence || s == Shape::Wall;
 }
 
 bool BlockExists(int id) { return id >= 0 && id < MAX_BLOCK_ID && GetTables().registry.blocks[id] != nullptr; }
@@ -254,6 +276,13 @@ void BreakAndDrop(World& world, int x, int y, int z) {
     world.SetBlock(x, y, z, BLOCK_AIR);
 }
 
+bool PlacedInUpperHalf(const Player& player, int side) {
+    if (side == SIDE_DOWN) return true;
+    if (side == SIDE_UP) return false;
+    float y = player.GetTarget().point.y;
+    return y - std::floor(y) > 0.5f;
+}
+
 bool CanSupportOnTop(const World& world, int x, int y, int z) {
-    return world.IsNormalCube(x, y, z) || world.GetBlock(x, y, z) == BLOCK_FENCE;
+    return world.IsNormalCube(x, y, z) || IsTallPost(world.GetBlock(x, y, z));
 }

@@ -154,14 +154,14 @@ bool ItemModels::Is3D(const ItemStack& stack) {
 }
 
 const Mesh& ItemModels::BlockModel(int id, int meta) const {
-    int key = id | (meta & 15) << 8;
+    int key = id | (meta & 15) << 16;
     auto it = blockMeshes.find(key);
     if (it != blockMeshes.end()) return it->second;
     return blockMeshes.emplace(key, BuildBlockMesh(id, meta)).first->second;
 }
 
 const Mesh& ItemModels::FlatModel(const ItemStack& stack) const {
-    int key = stack.id | (int)stack.damage << 12;
+    int key = stack.id | (stack.damage & 0x7FFF) << 16;
     const ItemDef* def = GetItemDef(stack.id);
     bool damageable = def != nullptr && def->maxDamage > 0;
     if (damageable) key = stack.id; // wear doesn't change the look

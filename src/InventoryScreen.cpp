@@ -2,6 +2,7 @@
 #include "Crafting.h"
 #include "Gui.h"
 #include "Items.h"
+#include "ModernBlocks.h"
 #include "TileEntity.h"
 
 #include <algorithm>
@@ -139,7 +140,37 @@ InventoryScreen::InventoryScreen(const ItemIcons& icons, const GuiFont& guiFont)
         { "Ingredients", 3, false, ItemStack(ITEM_IRON_INGOT, 1), {} },
         { "Survival Inventory", 6, false, ItemStack(BLOCK_CHEST, 1), {} },
     };
-    for (const ItemStack& stack : creativeItems) creativeTabs[CreativeCategory(stack)].items.push_back(stack);
+    // Building Blocks and Colored Blocks: 1.21's lists, in its order. The other tabs
+    // sort Beta's items; anything of Beta's the 1.21 lists leave out (its own
+    // slab kinds...) is only in the search.
+    auto fromNames = [](const char* const* names, size_t count) {
+        std::vector<ItemStack> list;
+        for (size_t i = 0; i < count; i++) {
+            int id, meta;
+            if (LookupBlockName(names[i], id, meta)) list.emplace_back(id, 1, meta);
+        }
+        return list;
+    };
+    creativeTabs[0].items = fromNames(BUILDING_TAB, sizeof(BUILDING_TAB) / sizeof(BUILDING_TAB[0]));
+    creativeTabs[1].items = fromNames(COLORED_TAB, sizeof(COLORED_TAB) / sizeof(COLORED_TAB[0]));
+    for (const ItemStack& stack : creativeItems) {
+        int tab = CreativeCategory(stack);
+        if (tab != 0 && tab != 1) creativeTabs[tab].items.push_back(stack);
+    }
+    // The search tab: every tab's items once each, then Beta's leftovers.
+    std::vector<ItemStack> everything;
+    auto addOnce = [&](const ItemStack& stack) {
+        for (const ItemStack& s : everything) {
+            if (s.id == stack.id && s.damage == stack.damage) return;
+        }
+        everything.push_back(stack);
+    };
+    for (size_t t = 0; t < creativeTabs.size(); t++) {
+        if ((int)t == SEARCH_TAB) continue;
+        for (const ItemStack& stack : creativeTabs[t].items) addOnce(stack);
+    }
+    for (const ItemStack& stack : creativeItems) addOnce(stack);
+    creativeItems = everything;
     creativeTabs[SEARCH_TAB].items = creativeItems;
     shownItems = creativeTabs[0].items;
 }

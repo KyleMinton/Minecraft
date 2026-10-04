@@ -51,32 +51,45 @@ public:
 };
 
 // ---- Stairs (BlockStairs): take their looks from a base block, and (in Beta)
-// drop that block when broken.
+// drop that block when broken. Metadata: bits 0-1 facing; bit 2 upside down
+// (from 1.3: placed against the top half of a block, or its underside).
 
 class StairsBlock final : public Block {
 public:
     BlockId model = BLOCK_PLANKS;
+    int modelMeta = 0;
+    bool dropsModel = true; // Beta's stairs drop their base block; later ones drop themselves
     StairsBlock() {
         shape = Shape::Stairs;
         opaqueCube = false;
         normalCube = false;
         lightOpacity = 255;
     }
-    int Texture(int side, int meta) const override { return GetBlockDef(model).Texture(side, 0); }
+    int Texture(int side, int meta) const override { return GetBlockDef(model).Texture(side, modelMeta); }
     void CollisionBoxes(const World& world, int x, int y, int z, std::vector<BlockBox>& out) const override {
+        size_t first = out.size();
         switch (world.GetMeta(x, y, z) & 3) {
             case 0: out.push_back(MakeBox(0, 0, 0, 0.5f, 0.5f, 1)); out.push_back(MakeBox(0.5f, 0, 0, 1, 1, 1)); break;
             case 1: out.push_back(MakeBox(0, 0, 0, 0.5f, 1, 1)); out.push_back(MakeBox(0.5f, 0, 0, 1, 0.5f, 1)); break;
             case 2: out.push_back(MakeBox(0, 0, 0, 1, 0.5f, 0.5f)); out.push_back(MakeBox(0, 0, 0.5f, 1, 1, 1)); break;
             case 3: out.push_back(MakeBox(0, 0, 0, 1, 1, 0.5f)); out.push_back(MakeBox(0, 0, 0.5f, 1, 0.5f, 1)); break;
         }
+        if (world.GetMeta(x, y, z) & 4) {
+            for (size_t i = first; i < out.size(); i++) {
+                BlockBox& b = out[i];
+                float lo = 1.0f - b.maxY, hi = 1.0f - b.minY;
+                b.minY = lo;
+                b.maxY = hi;
+            }
+        }
     }
-    void OnPlaced(World& world, int x, int y, int z, int, const Player& player) const override {
+    void OnPlaced(World& world, int x, int y, int z, int side, const Player& player) const override {
         static const int metas[4] = { 2, 1, 3, 0 };
-        world.SetMeta(x, y, z, metas[PlayerYawIndex(player)]);
+        world.SetMeta(x, y, z, metas[PlayerYawIndex(player)] | (PlacedInUpperHalf(player, side) ? 4 : 0));
     }
     void Drops(World& world, int x, int y, int z, int, JavaRandom& random, std::vector<ItemStack>& out) const override {
-        GetBlockDef(model).Drops(world, x, y, z, 0, random, out);
+        if (dropsModel) GetBlockDef(model).Drops(world, x, y, z, modelMeta, random, out);
+        else out.push_back(ItemStack(id, 1));
     }
     ItemStack PickItem(const World&, int, int, int) const override { return ItemStack(id, 1); }
 };
@@ -91,15 +104,12 @@ public:
         normalCube = false;
         lightOpacity = 0;
     }
-    static bool Connects(const World& world, int x, int y, int z) {
-        int id = world.GetBlock(x, y, z);
-        return id == BLOCK_FENCE || id == BLOCK_FENCE_GATE;
-    }
+    static bool Connects(const World& world, int x, int y, int z) { return FenceJoins(world.GetBlock(x, y, z)); }
     void CollisionBoxes(const World&, int, int, int, std::vector<BlockBox>& out) const override {
         out.push_back(MakeBox(0, 0, 0, 1, 1.5f, 1));
     }
     bool CanPlaceAt(const World& world, int x, int y, int z) const override {
-        if (world.GetBlock(x, y - 1, z) == id) return Block::CanPlaceAt(world, x, y, z);
+        if (IsTallPost(world.GetBlock(x, y - 1, z))) return Block::CanPlaceAt(world, x, y, z);
         if (!GetMaterialInfo(world.GetMaterial(x, y - 1, z)).solid) return false;
         return Block::CanPlaceAt(world, x, y, z);
     }
@@ -158,10 +168,9 @@ public:
     int edgeTexture = 148;
     bool dropsSelf = true;
     PaneBlock() { SetNotCube(*this, Shape::Pane, Layer::Cutout, 0); }
-    static bool Connects(const World& world, int x, int y, int z, int self) {
-        int id = world.GetBlock(x, y, z);
-        return BlockIsOpaqueCube((BlockId)id) || id == self || id == BLOCK_GLASS;
-    }
+    // The top and bottom are the thin edge strip (the renderer reads it from here).
+    int Texture(int side, int meta) const override { return side <= SIDE_UP ? edgeTexture : texture; }
+    static bool Connects(const World& world, int x, int y, int z, int self) { return PaneJoins(world.GetBlock(x, y, z)); }
     void CollisionBoxes(const World& world, int x, int y, int z, std::vector<BlockBox>& out) const override {
         bool n = Connects(world, x, y, z - 1, id), s = Connects(world, x, y, z + 1, id);
         bool w = Connects(world, x - 1, y, z, id), e = Connects(world, x + 1, y, z, id);
@@ -184,6 +193,9 @@ public:
 class DoorBlock final : public Block {
 public:
     int item = ITEM_WOODEN_DOOR;
+    int topTexture = -1; // -1: the tile above `texture`, as in Beta's terrain.png
+    int itemIcon = -1;   // the item's terrain.png tile, for doors that are their own item
+    bool byHand = false; // opens by hand even though it's metal (copper doors)
     DoorBlock() {
         shape = Shape::Door;
         opaqueCube = false;
@@ -192,8 +204,11 @@ public:
         layer = Layer::Cutout;
     }
     static int State(int meta) { return (meta & 4) == 0 ? ((meta - 1) & 3) : (meta & 3); }
-    int Texture(int side, int meta) const override { return (meta & 8) ? texture - 16 : texture; }
-    int ItemIconTexture(int) const override { return texture; }
+    int Texture(int side, int meta) const override {
+        if ((meta & 8) == 0) return texture;
+        return topTexture >= 0 ? topTexture : texture - 16;
+    }
+    int ItemIconTexture(int) const override { return itemIcon >= 0 ? itemIcon : texture; }
     BlockBox Bounds(const World& world, int x, int y, int z) const override {
         const float t = 0.1875f;
         switch (State(world.GetMeta(x, y, z))) {
@@ -219,7 +234,7 @@ public:
                         world.Random().NextFloat() * 0.1f + 0.9f);
     }
     bool OnActivated(World& world, int x, int y, int z, Player& player) const override {
-        if (material == BlockMaterial::Iron) return true;
+        if (material == BlockMaterial::Iron && !byHand) return true;
         int meta = world.GetMeta(x, y, z);
         if (meta & 8) {
             if (world.GetBlock(x, y - 1, z) == id) OnActivated(world, x, y - 1, z, player);
@@ -229,7 +244,7 @@ public:
         return true;
     }
     void OnClicked(World& world, int x, int y, int z, Player& player) const override {
-        if (material != BlockMaterial::Iron) OnActivated(world, x, y, z, player);
+        if (material != BlockMaterial::Iron || byHand) OnActivated(world, x, y, z, player);
     }
     void SetPowered(World& world, int x, int y, int z, bool powered) const {
         int meta = world.GetMeta(x, y, z);
@@ -276,6 +291,7 @@ public:
 
 class TrapdoorBlock final : public Block {
 public:
+    bool iron = false; // opened only by redstone
     TrapdoorBlock() {
         SetNotCube(*this, Shape::Cube, Layer::Cutout, 0);
     }
@@ -322,12 +338,15 @@ public:
         world.SetMeta(x, y, z, meta);
     }
     bool OnActivated(World& world, int x, int y, int z, Player&) const override {
+        if (iron) return true;
         world.SetMeta(x, y, z, world.GetMeta(x, y, z) ^ 4);
         world.PlaySound(world.Random().NextDouble() < 0.5 ? "random.door_open" : "random.door_close", x + 0.5, y + 0.5, z + 0.5, 1.0f,
                         world.Random().NextFloat() * 0.1f + 0.9f);
         return true;
     }
-    void OnClicked(World& world, int x, int y, int z, Player& player) const override { OnActivated(world, x, y, z, player); }
+    void OnClicked(World& world, int x, int y, int z, Player& player) const override {
+        if (!iron) OnActivated(world, x, y, z, player);
+    }
     void OnNeighborChanged(World& world, int x, int y, int z, int neighbor) const override {
         int meta = world.GetMeta(x, y, z);
         int dx, dz;
@@ -576,4 +595,52 @@ void RegisterStairs(BlockRegistry& r) {
     stairs(BLOCK_COBBLESTONE_STAIRS, "Stone Stairs", BLOCK_COBBLESTONE);
     stairs(BLOCK_BRICK_STAIRS, "Brick Stairs", BLOCK_BRICKS);
     stairs(BLOCK_STONE_BRICK_STAIRS, "Stone Brick Stairs", BLOCK_STONE_BRICKS);
+}
+
+// ---- Beta's classes for the blocks after Beta (RegisterModernBlocks sets their
+// names, hardness and sounds).
+
+Block& AddStairs(BlockRegistry& r, int id, int model, int modelMeta) {
+    auto& b = r.Add<StairsBlock>(id);
+    b.model = (BlockId)model;
+    b.modelMeta = modelMeta;
+    b.dropsModel = false;
+    return b;
+}
+
+Block& AddFence(BlockRegistry& r, int id, int texture) {
+    auto& b = r.Add<FenceBlock>(id);
+    b.texture = texture;
+    return b;
+}
+
+Block& AddFenceGate(BlockRegistry& r, int id, int texture) {
+    auto& b = r.Add<FenceGateBlock>(id);
+    b.texture = texture;
+    return b;
+}
+
+Block& AddPane(BlockRegistry& r, int id, int texture, int edgeTexture) {
+    auto& b = r.Add<PaneBlock>(id);
+    b.texture = texture;
+    b.edgeTexture = edgeTexture;
+    return b;
+}
+
+// A door that is its own item (doors after Beta), drawn from two textures.
+Block& AddDoor(BlockRegistry& r, int id, int bottomTexture, int topTexture, int itemIcon, bool iron) {
+    auto& b = r.Add<DoorBlock>(id);
+    b.texture = bottomTexture;
+    b.topTexture = topTexture;
+    b.itemIcon = itemIcon;
+    b.item = id;
+    b.byHand = !iron;
+    return b;
+}
+
+Block& AddTrapdoor(BlockRegistry& r, int id, int texture, bool iron) {
+    auto& b = r.Add<TrapdoorBlock>(id);
+    b.texture = texture;
+    b.iron = iron;
+    return b;
 }

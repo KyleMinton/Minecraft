@@ -174,7 +174,8 @@ enum class StepSound : uint8_t { None, Stone, Wood, Gravel, Grass, Cloth, Sand, 
 // How a block is drawn (RenderBlocks' render types).
 enum class Shape : uint8_t {
     None, Cube, Cross, Torch, Fire, Fluid, RedstoneWire, Crops, Door, Ladder, Rail, Stairs, Fence, Lever,
-    Cactus, Bed, Repeater, PistonBase, PistonHead, Pane, Stem, Vine, FenceGate, Chest, Sign, MovingPiston
+    Cactus, Bed, Repeater, PistonBase, PistonHead, Pane, Stem, Vine, FenceGate, Chest, Sign, MovingPiston,
+    Wall, Chain // later versions' shapes
 };
 
 // Which pass a block's faces go in: solid, alpha-tested (leaves, glass, plants),
@@ -223,6 +224,8 @@ public:
     // Faces of this block next to (nx, ny, nz), which is on `side`, are drawn unless hidden.
     virtual bool ShouldSideBeRendered(const World& world, int nx, int ny, int nz, int side) const;
     virtual int ItemIconTexture(int meta) const { return Texture(SIDE_NORTH, meta); }
+    // Quarter turns (clockwise) of a face's texture: logs lying on their side, glazed terracotta.
+    virtual int FaceTextureRotation(int side, int meta) const { return 0; }
     virtual bool RendersAs3DItem() const;
 
     // ---- Shape
@@ -239,6 +242,9 @@ public:
     virtual bool CanStay(const World& world, int x, int y, int z) const { return true; }
     // After placing (from an item), aimed at `side` of the block clicked; sets facing.
     virtual void OnPlaced(World& world, int x, int y, int z, int side, const Player& player) const {}
+    // Using this block's item on `side` of a block of the same kind: true if it combined
+    // with it (a slab onto a slab making a double slab) rather than placing a new block.
+    virtual bool CombineFromItem(World& world, int x, int y, int z, int side) const { return false; }
     virtual int MetaForPlacement(int itemDamage) const { return itemDamage; }
 
     // ---- World events
@@ -287,6 +293,13 @@ public:
 const Block& GetBlockDef(BlockId id);
 // Is there a block with this ID (anything registered, air included)?
 bool BlockExists(int id);
+
+// What fences, walls and panes join up with: their own kinds and full solid blocks.
+bool FenceJoins(BlockId id);
+bool WallJoins(BlockId id);
+bool PaneJoins(BlockId id);
+// A fence or wall: 1.5 blocks tall to anything standing or landing on it.
+bool IsTallPost(BlockId id);
 
 // Quick lookups the light engine and mesher use a lot.
 int BlockLightOpacity(BlockId id);

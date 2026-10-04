@@ -16,7 +16,7 @@ constexpr int ITEM_SIZE = 16;
 constexpr float ICON_PITCH = 30.0f * DEG2RAD, ICON_YAW = 45.0f * DEG2RAD;
 
 int IconKey(const ItemStack& stack) {
-    return stack.id | (stack.damage & 15) << 8;
+    return stack.id | (stack.damage & 15) << 16;
 }
 
 // 1.21's lighting for blocks in GUIs (Lighting.setupFor3DItems, and
@@ -63,7 +63,10 @@ ItemIcons::ItemIcons(const ItemModels& itemModels) : models(itemModels) {
     SetShaderValue(shader, GetShaderLocation(shader, "fogStart"), &farAway, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader, GetShaderLocation(shader, "fogEnd"), &fartherAway, SHADER_UNIFORM_FLOAT);
     SetShaderValue(shader, GetShaderLocation(shader, "skyDarken"), &zero, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(shader, GetShaderLocation(shader, "translucentPass"), &zero, SHADER_UNIFORM_FLOAT);
+    // Drawn as the translucent pass, blended: stained glass keeps its see-through tint
+    // (the opaque pass would cut its half-clear pixels away); clear pixels still drop.
+    float one = 1.0f;
+    SetShaderValue(shader, GetShaderLocation(shader, "translucentPass"), &one, SHADER_UNIFORM_FLOAT);
 }
 
 ItemIcons::~ItemIcons() {
@@ -94,7 +97,7 @@ void ItemIcons::Prepare() {
     int size = ITEM_SIZE * iconScale;
     Material material = MakeMaterial(shader, models.Atlas());
     for (int key : pending) {
-        int id = key & 0xFF, meta = key >> 8;
+        int id = key & 0xFFFF, meta = key >> 16;
         Mesh mesh = BuildBlockTerrainMesh(id, ItemRenderMeta(ItemStack(id, 1, meta)), GuiShade);
         RenderTexture2D target = LoadRenderTexture(size, size);
         SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
@@ -102,7 +105,9 @@ void ItemIcons::Prepare() {
             ClearBackground(BLANK);
             if (mesh.vertexCount > 0) {
                 BeginMode3D(camera);
+                    BeginBlendMode(BLEND_ALPHA);
                     DrawMesh(mesh, material, MatrixIdentity());
+                    EndBlendMode();
                 EndMode3D();
             }
         EndTextureMode();

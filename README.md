@@ -108,6 +108,21 @@ cmake --build build --config Release --target ModernTextures
 ./build/Release/ModernTextures.exe "C:/Users/<you>/AppData/Roaming/.minecraft/versions/1.21/1.21/assets/minecraft" resources
 ```
 
+## Blocks after Beta
+
+The blocks from later versions (1.21's building and colored blocks) are listed in
+`tools/modern_blocks.py`, which writes `src/ModernBlocksData.h`: each block's
+shape, textures and hardness, and the order of the Building Blocks and Colored
+Blocks creative tabs. To add blocks, edit the script, then run it and rebuild
+the textures:
+
+```bash
+python tools/modern_blocks.py
+```
+
+Block IDs are positions in that list, and saved worlds store them, so the
+script only ever appends new blocks to the end.
+
 Water, lava, fire and portal animate from the strips in `resources/textures/animated`.
 Menu music plays from `resources/sounds/music/menu`.
 

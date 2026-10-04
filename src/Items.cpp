@@ -25,6 +25,11 @@ public:
     IconSheet Sheet() const override { return IconSheet::Terrain; }
     Color Tint(int damage) const override { return GetBlockDef((BlockId)id).ItemTint(damage); }
     bool UseOnBlock(ItemStack& stack, Player& player, World& world, int x, int y, int z, int side) const override {
+        // A slab onto the same slab's open side makes a double slab.
+        if (world.GetBlock(x, y, z) == id && GetBlockDef((BlockId)id).CombineFromItem(world, x, y, z, side)) {
+            stack.count--;
+            return true;
+        }
         if (world.GetBlock(x, y, z) == BLOCK_SNOW_LAYER) {
             side = SIDE_DOWN;
         } else {
@@ -85,6 +90,8 @@ public:
 class DoorItemDef final : public ItemDef {
 public:
     int block = BLOCK_WOODEN_DOOR;
+    IconSheet sheet = IconSheet::Items; // later doors' icons are in terrain.png
+    IconSheet Sheet() const override { return sheet; }
     bool UseOnBlock(ItemStack& stack, Player& player, World& world, int x, int y, int z, int side) const override {
         if (side != SIDE_UP) return false;
         y++;
@@ -318,7 +325,20 @@ struct ItemTable {
     ItemTable() {
         for (int b = 1; b < BLOCK_COUNT; b++) items[b] = std::make_unique<BlockItemDef>(b);
         for (int b = FIRST_MODERN_BLOCK; b < MAX_BLOCK_ID; b++) {
-            if (BlockExists(b)) items[b] = std::make_unique<BlockItemDef>(b);
+            if (!BlockExists(b)) continue;
+            const Block& block = GetBlockDef((BlockId)b);
+            if (block.shape == Shape::Door) {
+                // A door is its own item since 1.13: it places both halves.
+                auto door = std::make_unique<DoorItemDef>();
+                door->id = (uint16_t)b;
+                door->name = block.name;
+                door->icon = block.ItemIconTexture(0);
+                door->sheet = IconSheet::Terrain;
+                door->block = b;
+                items[b] = std::move(door);
+            } else {
+                items[b] = std::make_unique<BlockItemDef>(b);
+            }
         }
 
         Tool(ITEM_IRON_SHOVEL, "Iron Shovel", 82, ToolType::Shovel, TIER_IRON);
@@ -493,7 +513,7 @@ float ToolSpeed(const ItemStack& held, BlockId block, int meta) {
                 case BLOCK_SNOW: case BLOCK_CLAY: case BLOCK_FARMLAND: case BLOCK_SOUL_SAND:
                     return def->efficiency;
                 default:
-                    return 1.0f;
+                    return b.material == BlockMaterial::Sand ? def->efficiency : 1.0f; // concrete powder
             }
         case ToolType::Axe:
             if (b.material == BlockMaterial::Wood || block == BLOCK_PLANKS || block == BLOCK_BOOKSHELF || block == BLOCK_LOG || block == BLOCK_CHEST) {

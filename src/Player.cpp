@@ -929,7 +929,7 @@ void Player::MoveEntity(World& world, double dx, double dy, double dz, SoundSyst
 
     int fx = (int)floor(posX), fy = (int)floor(posY - 0.2), fz = (int)floor(posZ);
     BlockId under = world.GetBlock(fx, fy, fz);
-    if (under == BLOCK_AIR && world.GetBlock(fx, fy - 1, fz) == BLOCK_FENCE) under = BLOCK_FENCE;
+    if (under == BLOCK_AIR && IsTallPost(world.GetBlock(fx, fy - 1, fz))) under = world.GetBlock(fx, fy - 1, fz);
 
     if (onGround) {
         // Landing (Entity.updateFallState): the block feels it, and each block

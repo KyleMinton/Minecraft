@@ -1,6 +1,7 @@
 #include "BlocksCommon.h"
 #include "Colors.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -104,13 +105,36 @@ public:
 
 class LogBlock final : public CubeBlock {
 public:
-    std::string DisplayName(int meta) const override { return "Wood"; }
+    // Metadata: bits 0-1 the wood (oak, spruce, birch); bits 2-3 which way it lies
+    // (1.3's logs): 0 upright, 1 along X, 2 along Z.
+    std::string DisplayName(int meta) const override {
+        static const char* names[3] = { "Oak Log", "Spruce Log", "Birch Log" };
+        return names[std::min(meta & 3, 2)];
+    }
+    static bool EndFace(int side, int meta) {
+        int axis = (meta >> 2) & 3;
+        if (axis == 1) return side == SIDE_WEST || side == SIDE_EAST;
+        if (axis == 2) return side == SIDE_NORTH || side == SIDE_SOUTH;
+        return side == SIDE_UP || side == SIDE_DOWN;
+    }
     int Texture(int side, int meta) const override {
+        int type = meta & 3;
         // Spruce and birch end grain: 1.21's own, in tiles Beta left empty (213, 214).
-        if (side == SIDE_UP || side == SIDE_DOWN) return meta == 1 ? 213 : meta == 2 ? 214 : 21;
-        if (meta == 1) return 116;
-        if (meta == 2) return 117;
+        if (EndFace(side, meta)) return type == 1 ? 213 : type == 2 ? 214 : 21;
+        if (type == 1) return 116;
+        if (type == 2) return 117;
         return 20;
+    }
+    // Lying down, the bark runs along the log.
+    int FaceTextureRotation(int side, int meta) const override {
+        int axis = (meta >> 2) & 3;
+        if (axis == 1 && side != SIDE_WEST && side != SIDE_EAST) return 1;
+        if (axis == 2 && (side == SIDE_WEST || side == SIDE_EAST)) return 1;
+        return 0;
+    }
+    void OnPlaced(World& world, int x, int y, int z, int side, const Player&) const override {
+        int axis = (side == SIDE_WEST || side == SIDE_EAST) ? 1 : (side == SIDE_NORTH || side == SIDE_SOUTH) ? 2 : 0;
+        world.SetMeta(x, y, z, (world.GetMeta(x, y, z) & 3) | axis << 2, false);
     }
     int DamageDropped(int meta) const override { return meta & 3; }
     void OnRemoved(World& world, int x, int y, int z, int) const override {

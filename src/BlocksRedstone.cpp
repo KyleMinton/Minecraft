@@ -15,7 +15,7 @@ public:
     TorchBlock() { SetNotCube(*this, Shape::Torch, Layer::Cutout, 0); }
 
     static bool CanHoldTorch(const World& world, int x, int y, int z) {
-        return world.IsNormalCube(x, y, z) || world.GetBlock(x, y, z) == BLOCK_FENCE;
+        return world.IsNormalCube(x, y, z) || IsTallPost(world.GetBlock(x, y, z));
     }
     BlockBox Bounds(const World& world, int x, int y, int z) const override {
         int meta = world.GetMeta(x, y, z) & 7;
@@ -540,7 +540,6 @@ public:
 class ButtonBlock final : public Block {
 public:
     ButtonBlock() { SetNotCube(*this, Shape::Cube, Layer::Opaque, 0); tickRate = 20; }
-    int Texture(int, int) const override { return 1; }
     BlockBox Box(int meta) const {
         int a = meta & 7;
         bool pressed = (meta & 8) != 0;
@@ -991,4 +990,21 @@ void RegisterRedstoneBlocks(BlockRegistry& r) {
     Props(r.Add<RailBlock>(BLOCK_RAIL), "Rail", 128, 0.7f, BlockMaterial::Circuits, StepSound::Metal);
     Props(r.Add<RailBlock>(BLOCK_POWERED_RAIL), "Powered Rail", 179, 0.7f, BlockMaterial::Circuits, StepSound::Metal);
     Props(r.Add<RailBlock>(BLOCK_DETECTOR_RAIL), "Detector Rail", 195, 0.7f, BlockMaterial::Circuits, StepSound::Metal);
+}
+
+// ---- Beta's classes for the blocks after Beta (RegisterModernBlocks sets the rest).
+
+Block& AddPressurePlate(BlockRegistry& r, int id, int texture, bool anything) {
+    auto& b = r.Add<PressurePlateBlock>(id);
+    b.texture = texture;
+    b.anything = anything;
+    return b;
+}
+
+// Wooden buttons (1.4+) stay pressed for 30 ticks, stone ones 20.
+Block& AddButton(BlockRegistry& r, int id, int texture, bool wooden) {
+    auto& b = r.Add<ButtonBlock>(id);
+    b.texture = texture;
+    if (wooden) b.tickRate = 30;
+    return b;
 }

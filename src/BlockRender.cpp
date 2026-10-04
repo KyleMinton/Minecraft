@@ -257,6 +257,18 @@ void RenderBox(Ctx& c, const BlockBox& b, Cull cull, Layer layer, int texOverrid
         FaceStyle style;
         style.tex = texOverride >= 0 ? texOverride : c.Tex(side);
         style.tint = c.Tint(side);
+        // A turned texture: each quarter turn clockwise, the texture's up becomes the face's right.
+        int turns = c.def.FaceTextureRotation(side, c.meta) & 3;
+        if (turns != 0) {
+            int right = DEFAULT_RIGHT[side], up = DEFAULT_UP[side];
+            for (int t = 0; t < turns; t++) {
+                int newUp = right;
+                right = OppositeSide(up);
+                up = newUp;
+            }
+            style.right = right;
+            style.up = up;
+        }
         EmitBoxFace(c, b, side, style, layer);
     }
 }
@@ -631,6 +643,7 @@ void RenderVine(Ctx& c) {
 
 void RenderStairs(Ctx& c) {
     int meta = c.world ? c.meta & 3 : 0;
+    bool upsideDown = c.world && (c.meta & 4) != 0;
     BlockBox a, b;
     switch (meta) {
         case 0: a = MakeBoxLocal(0, 0, 0, 0.5f, 0.5f, 1); b = MakeBoxLocal(0.5f, 0, 0, 1, 1, 1); break;
@@ -638,14 +651,18 @@ void RenderStairs(Ctx& c) {
         case 2: a = MakeBoxLocal(0, 0, 0, 1, 0.5f, 0.5f); b = MakeBoxLocal(0, 0, 0.5f, 1, 1, 1); break;
         default: a = MakeBoxLocal(0, 0, 0, 1, 1, 0.5f); b = MakeBoxLocal(0, 0, 0.5f, 1, 0.5f, 1); break;
     }
+    if (upsideDown) {
+        for (BlockBox* box : { &a, &b }) {
+            float lo = 1.0f - box->maxY, hi = 1.0f - box->minY;
+            box->minY = lo;
+            box->maxY = hi;
+        }
+    }
     RenderBox(c, a, Cull::Neighbor, Layer::Opaque);
     RenderBox(c, b, Cull::Neighbor, Layer::Opaque);
 }
 
-bool FenceConnects(const Ctx& c, int dx, int dz) {
-    int id = c.Get(dx, 0, dz);
-    return id == BLOCK_FENCE || id == BLOCK_FENCE_GATE;
-}
+bool FenceConnects(const Ctx& c, int dx, int dz) { return FenceJoins(c.Get(dx, 0, dz)); }
 
 void RenderFence(Ctx& c) {
     if (c.world == nullptr) {
@@ -666,6 +683,45 @@ void RenderFence(Ctx& c) {
         if (alongX) RenderBox(c, MakeBoxLocal(x0, y0, f, x1, y1, f1), Cull::None, Layer::Opaque);
         if (alongZ) RenderBox(c, MakeBoxLocal(f, y0, z0, f1, y1, z1), Cull::None, Layer::Opaque);
     }
+}
+
+// Walls (1.21's template_wall_post/side): an 8-wide post, and 6-wide arms 14 high
+// toward what they join, or the full block high under something solid. The post
+// goes when the wall runs straight through with nothing on top.
+void RenderWall(Ctx& c) {
+    if (c.world == nullptr) {
+        // The item (1.21's wall_inventory): the post with arms north and south.
+        RenderBox(c, MakeBoxLocal(0.25f, 0, 0.25f, 0.75f, 1, 0.75f), Cull::None, Layer::Opaque);
+        RenderBox(c, MakeBoxLocal(0.3125f, 0, 0, 0.6875f, 0.875f, 1), Cull::None, Layer::Opaque);
+        return;
+    }
+    auto joins = [&](int dx, int dz) { return WallJoins(c.Get(dx, 0, dz)); };
+    bool n = joins(0, -1), s = joins(0, 1), w = joins(-1, 0), e = joins(1, 0);
+    BlockId above = c.Get(0, 1, 0);
+    bool covered = above != BLOCK_AIR && GetBlockDef(above).BlocksMovement();
+    bool straight = (n && s && !w && !e) || (w && e && !n && !s);
+    if (!straight || above != BLOCK_AIR) RenderBox(c, MakeBoxLocal(0.25f, 0, 0.25f, 0.75f, 1, 0.75f), Cull::Neighbor, Layer::Opaque);
+    float h = covered ? 1.0f : 0.875f;
+    const float a = 0.3125f, b = 0.6875f;
+    if (n) RenderBox(c, MakeBoxLocal(a, 0, 0, b, h, 0.5f), Cull::Neighbor, Layer::Opaque);
+    if (s) RenderBox(c, MakeBoxLocal(a, 0, 0.5f, b, h, 1), Cull::Neighbor, Layer::Opaque);
+    if (w) RenderBox(c, MakeBoxLocal(0, 0, a, 0.5f, h, b), Cull::Neighbor, Layer::Opaque);
+    if (e) RenderBox(c, MakeBoxLocal(0.5f, 0, a, 1, h, b), Cull::Neighbor, Layer::Opaque);
+}
+
+// Chains (1.21's chain model): two crossed strips, each three texels wide,
+// the first from texels 0-3 of the texture and the second from 3-6.
+void RenderChain(Ctx& c) {
+    int tex = c.Tex(SIDE_NORTH);
+    Light2 light = c.Own();
+    const float lo = 6.5f / 16, hi = 9.5f / 16;
+    Vector2 uv[4];
+    TileCorners(tex, uv, 0.0f, 0.0f, 3.0f / 16, 1.0f);
+    Vector3 a[4] = { { lo, 1, 0.5f }, { lo, 0, 0.5f }, { hi, 0, 0.5f }, { hi, 1, 0.5f } };
+    FreeQuad(c, a, uv, WHITE, Layer::Cutout, true, light);
+    TileCorners(tex, uv, 3.0f / 16, 0.0f, 6.0f / 16, 1.0f);
+    Vector3 b[4] = { { 0.5f, 1, lo }, { 0.5f, 0, lo }, { 0.5f, 0, hi }, { 0.5f, 1, hi } };
+    FreeQuad(c, b, uv, WHITE, Layer::Cutout, true, light);
 }
 
 void RenderFenceGate(Ctx& c) {
@@ -936,11 +992,8 @@ void RenderPistonHead(Ctx& c) {
 void RenderPane(Ctx& c) {
     int tex = c.Tex(SIDE_NORTH);
     const Block& def = c.def;
-    int edge = c.id == BLOCK_GLASS_PANE ? 148 : tex;
-    auto connects = [&](int dx, int dz) {
-        int id = c.Get(dx, 0, dz);
-        return BlockIsOpaqueCube((BlockId)id) || id == c.id || id == BLOCK_GLASS;
-    };
+    int edge = c.Tex(SIDE_UP);
+    auto connects = [&](int dx, int dz) { return PaneJoins(c.Get(dx, 0, dz)); };
     bool n = false, s = false, w = false, e = false;
     if (c.world) { n = connects(0, -1); s = connects(0, 1); w = connects(-1, 0); e = connects(1, 0); }
     bool none = !n && !s && !w && !e;
@@ -1055,6 +1108,8 @@ void Render(Ctx& c) {
         case Shape::Stem: RenderStem(c); return;
         case Shape::Vine: RenderVine(c); return;
         case Shape::FenceGate: RenderFenceGate(c); return;
+        case Shape::Wall: RenderWall(c); return;
+        case Shape::Chain: RenderChain(c); return;
     }
 }
 
@@ -1245,7 +1300,7 @@ void RenderWorldBlock(QuadSink& sink, const World& world, int x, int y, int z, V
 }
 
 void RenderBlockModel(QuadSink& sink, int id, int meta, Vector3 offset, float sky, float glow) {
-    if (id <= 0 || id >= 256) return;
+    if (id <= 0 || id >= MAX_BLOCK_ID) return;
     Ctx c{ sink, nullptr, 0, 0, 0, offset, id, meta, GetBlockDef((BlockId)id), Light2{ sky, glow } };
     Render(c);
 }

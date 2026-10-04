@@ -34,6 +34,18 @@ void RegisterBuildingBlocks(BlockRegistry& r);
 void RegisterContainerBlocks(BlockRegistry& r);
 void RegisterPistonBlocks(BlockRegistry& r);
 void RegisterStairs(BlockRegistry& r); // last: copies other blocks
+// The blocks from after Beta (ModernBlocks.h), after all of Beta's.
+void RegisterModernBlocks(BlockRegistry& r);
+
+// Beta's classes for building blocks, with other textures (for RegisterModernBlocks).
+Block& AddStairs(BlockRegistry& r, int id, int model, int modelMeta);
+Block& AddFence(BlockRegistry& r, int id, int texture);
+Block& AddFenceGate(BlockRegistry& r, int id, int texture);
+Block& AddPane(BlockRegistry& r, int id, int texture, int edgeTexture);
+Block& AddDoor(BlockRegistry& r, int id, int bottomTexture, int topTexture, int itemIcon, bool iron);
+Block& AddTrapdoor(BlockRegistry& r, int id, int texture, bool iron);
+Block& AddPressurePlate(BlockRegistry& r, int id, int texture, bool anything);
+Block& AddButton(BlockRegistry& r, int id, int texture, bool wooden);
 
 // Minecraft's Block setters, chainable: hardness also sets a matching explosion
 // resistance (setHardness), and setResistance(r) is stored as r * 3 / 5.
@@ -78,6 +90,10 @@ void DropStack(World& world, int x, int y, int z, const ItemStack& stack);
 
 // Removes a block that can no longer stay (a torch whose wall is gone...), dropping it.
 void BreakAndDrop(World& world, int x, int y, int z);
+
+// Was the block the player just placed aimed at the upper half of the face they
+// clicked (or at the underside of a block)? Upside-down stairs, top slabs.
+bool PlacedInUpperHalf(const Player& player, int side);
 
 // Can something that needs support (a torch, a pressure plate) sit on top of this block?
 bool CanSupportOnTop(const World& world, int x, int y, int z);

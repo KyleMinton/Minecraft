@@ -26,7 +26,7 @@ add_library(RaylibGame SHARED
     src/BlockBase.cpp src/BlocksBasic.cpp src/BlocksPlants.cpp src/BlocksFluids.cpp src/BlocksRedstone.cpp src/BlocksPiston.cpp
     src/BlocksBuilding.cpp src/BlocksContainers.cpp src/TileEntity.cpp src/TreeGen.cpp src/Items.cpp src/Crafting.cpp
     src/BlockRender.cpp src/Entities.cpp src/TextureFX.cpp src/TileEntityRenderer.cpp src/SignEditScreen.cpp
-    src/Options.cpp src/OptionsScreen.cpp src/Gui.cpp)
+    src/Options.cpp src/OptionsScreen.cpp src/Gui.cpp src/BlocksModern.cpp)
 target_link_libraries(RaylibGame PRIVATE raylib)
 
 # raylib already compiles stb_perlin.h into raylib.lib (used internally for
@@ -51,6 +51,7 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT $
 #   build/Release/ModernTextures.exe <.minecraft/versions/1.21/1.21/assets/minecraft> resources
 add_executable(ModernTextures EXCLUDE_FROM_ALL tools/ModernTextures.cpp)
 target_link_libraries(ModernTextures PRIVATE raylib)
+target_include_directories(ModernTextures PRIVATE src)
 
 # "cmake --install build --config Release --component Game" (as administrator) puts the game in C:/Program Files/RaylibApp:
 # RaylibApp.exe, RaylibGame.dll and resources/.
