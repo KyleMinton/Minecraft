@@ -271,5 +271,5 @@ private:
     void StopBreaking();
     void Swing();
     void TickHand();
-    float BreakDamagePerTick(const World& world, uint8_t block, int meta) const;
+    float BreakDamagePerTick(const World& world, BlockId block, int meta) const;
 };

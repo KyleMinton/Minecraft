@@ -109,7 +109,7 @@ void Block::CollisionBoxes(const World& world, int x, int y, int z, std::vector<
 }
 
 bool Block::CanPlaceAt(const World& world, int x, int y, int z) const {
-    uint8_t there = world.GetBlock(x, y, z);
+    BlockId there = world.GetBlock(x, y, z);
     return there == BLOCK_AIR || GetMaterialInfo(GetBlockDef(there).material).replaceable;
 }
 
@@ -143,10 +143,10 @@ public:
 
 struct Tables {
     BlockRegistry registry;
-    std::array<int, 256> opacity{};
-    std::array<int, 256> light{};
-    std::array<bool, 256> opaque{};
-    std::array<bool, 256> normal{};
+    std::array<int, MAX_BLOCK_ID> opacity{};
+    std::array<int, MAX_BLOCK_ID> light{};
+    std::array<bool, MAX_BLOCK_ID> opaque{};
+    std::array<bool, MAX_BLOCK_ID> normal{};
 
     Tables() {
         registry.Add<AirBlock>(BLOCK_AIR);
@@ -158,7 +158,7 @@ struct Tables {
         RegisterContainerBlocks(registry);
         RegisterPistonBlocks(registry);
         RegisterStairs(registry);
-        for (int id = 0; id < 256; id++) {
+        for (int id = 0; id < MAX_BLOCK_ID; id++) {
             const Block* block = registry.blocks[id].get();
             if (block == nullptr) block = registry.blocks[BLOCK_AIR].get();
             opacity[id] = block->lightOpacity;
@@ -176,16 +176,19 @@ const Tables& GetTables() {
 
 } // namespace
 
-const Block& GetBlockDef(uint8_t id) {
+// IDs past the table (a damaged save) read as air.
+const Block& GetBlockDef(BlockId id) {
     const Tables& t = GetTables();
-    const Block* block = t.registry.blocks[id].get();
+    const Block* block = id < MAX_BLOCK_ID ? t.registry.blocks[id].get() : nullptr;
     return block != nullptr ? *block : *t.registry.blocks[BLOCK_AIR];
 }
 
-int BlockLightOpacity(uint8_t id) { return GetTables().opacity[id]; }
-int BlockLightValue(uint8_t id) { return GetTables().light[id]; }
-bool BlockIsOpaqueCube(uint8_t id) { return GetTables().opaque[id]; }
-bool BlockIsNormalCube(uint8_t id) { return GetTables().normal[id]; }
+bool BlockExists(int id) { return id >= 0 && id < MAX_BLOCK_ID && GetTables().registry.blocks[id] != nullptr; }
+
+int BlockLightOpacity(BlockId id) { return id < MAX_BLOCK_ID ? GetTables().opacity[id] : 0; }
+int BlockLightValue(BlockId id) { return id < MAX_BLOCK_ID ? GetTables().light[id] : 0; }
+bool BlockIsOpaqueCube(BlockId id) { return id < MAX_BLOCK_ID && GetTables().opaque[id]; }
+bool BlockIsNormalCube(BlockId id) { return id < MAX_BLOCK_ID && GetTables().normal[id]; }
 
 // ---- Step sounds (Beta's StepSound, StepSoundStone for glass, StepSoundSand)
 

@@ -121,7 +121,7 @@ class MushroomBlock final : public PlantBlock {
 public:
     int type = 0; // 0 brown, 1 red
     MushroomBlock() { heightScale = 2.0f; }
-    bool CanGrowOn(int below) const override { return BlockIsOpaqueCube((uint8_t)below); }
+    bool CanGrowOn(int below) const override { return BlockIsOpaqueCube((BlockId)below); }
     bool CanStay(const World& world, int x, int y, int z) const override {
         if (y < 0 || y >= Chunk::HEIGHT) return false;
         return FullLight(world, x, y, z) < 13 && CanGrowOn(world.GetBlock(x, y - 1, z));
@@ -418,7 +418,7 @@ public:
     }
     static bool Supports(const World& world, int x, int y, int z) {
         int id = world.GetBlock(x, y, z);
-        return id != BLOCK_AIR && BlockIsOpaqueCube((uint8_t)id) && GetBlockDef((uint8_t)id).BlocksMovement();
+        return id != BLOCK_AIR && BlockIsOpaqueCube((BlockId)id) && GetBlockDef((BlockId)id).BlocksMovement();
     }
     Color ItemTint(int) const override { return FOLIAGE_COLOR; }
     Color WorldTint(const World&, int, int, int, int) const override { return FOLIAGE_COLOR; }
@@ -530,7 +530,7 @@ public:
     }
     bool CanPlaceAt(const World& world, int x, int y, int z) const override {
         int below = world.GetBlock(x, y - 1, z);
-        if (below == BLOCK_AIR || !BlockIsOpaqueCube((uint8_t)below)) return false;
+        if (below == BLOCK_AIR || !BlockIsOpaqueCube((BlockId)below)) return false;
         return GetMaterialInfo(world.GetMaterial(x, y - 1, z)).solid;
     }
     void OnNeighborChanged(World& world, int x, int y, int z, int) const override {

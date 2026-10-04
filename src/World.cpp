@@ -27,7 +27,13 @@ constexpr double MESH_BUDGET_SECONDS = 0.004; // per frame; at least one mesh is
 constexpr double TICK_SECONDS = 0.05;
 constexpr int MAX_TICKS_PER_FRAME = 5;
 constexpr int RANDOM_TICKS_PER_CHUNK = 10;    // Beta's 20 per 128-tall chunk, for our 64-tall ones
-constexpr char EDITS_MAGIC[4] = { 'B', 'E', 'D', '1' };
+constexpr char EDITS_MAGIC[4] = { 'B', 'E', 'D', '2' };    // 16-bit block IDs
+constexpr char EDITS_MAGIC_V1[4] = { 'B', 'E', 'D', '1' }; // 8-bit block IDs (before 1.21 blocks)
+
+// A changed block as the edit list keeps it: ID in the low 16 bits, metadata above.
+uint32_t EditValue(int id, int meta) {
+    return (uint32_t)(id & 0xFFFF) | (uint32_t)(meta & 15) << 16;
+}
 
 int EditIndex(int x, int y, int z) {
     return x + Chunk::SIZE * (z + Chunk::SIZE * y);
@@ -46,7 +52,7 @@ int SignExtend26(int64_t v) {
 }
 
 // Block IDs of this game before it had every Beta block.
-uint8_t LegacyBlock(uint8_t old) {
+BlockId LegacyBlock(uint8_t old) {
     static const uint8_t map[18] = {
         BLOCK_AIR, BLOCK_GRASS, BLOCK_DIRT, BLOCK_STONE, BLOCK_SAND, BLOCK_WATER, BLOCK_LOG, BLOCK_LEAVES, BLOCK_COBBLESTONE,
         BLOCK_GRAVEL, BLOCK_BEDROCK, BLOCK_COAL_ORE, BLOCK_IRON_ORE, BLOCK_GOLD_ORE, BLOCK_DIAMOND_ORE, BLOCK_SANDSTONE,
@@ -123,8 +129,10 @@ int World::ChunkCoord(int worldCoord) {
 
 // ---- Saving
 
-// edits.dat: "BED1", then for each edited chunk its X and Z (int32), how many
-// edits (int32), and each edit's block index (uint16), block ID and metadata (uint8 each).
+// edits.dat: "BED2", then for each edited chunk its X and Z (int32), how many
+// edits (int32), and each edit's block index (uint16), block ID (uint16) and
+// metadata (uint8). Older saves are "BED1" (one-byte IDs, Beta's blocks only)
+// or, before that, a headerless list in this game's first block numbering.
 bool World::SaveEdits(const std::string& path) const {
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out) return false;
@@ -136,9 +144,10 @@ bool World::SaveEdits(const std::string& path) const {
         write32((int32_t)chunkEdits.size());
         for (const auto& [index, value] : chunkEdits) {
             uint16_t i = (uint16_t)index;
-            uint8_t id = (uint8_t)(value & 0xFF), meta = (uint8_t)(value >> 8);
+            uint16_t id = (uint16_t)(value & 0xFFFF);
+            uint8_t meta = (uint8_t)(value >> 16);
             out.write((const char*)&i, 2);
-            out.write((const char*)&id, 1);
+            out.write((const char*)&id, 2);
             out.write((const char*)&meta, 1);
         }
     }
@@ -149,7 +158,11 @@ bool World::LoadEdits(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) return false;
     char magic[4] = {};
-    if (!in.read(magic, 4) || memcmp(magic, EDITS_MAGIC, 4) != 0) {
+    if (!in.read(magic, 4)) return LoadLegacyEdits(path);
+    int idBytes;
+    if (memcmp(magic, EDITS_MAGIC, 4) == 0) idBytes = 2;
+    else if (memcmp(magic, EDITS_MAGIC_V1, 4) == 0) idBytes = 1;
+    else {
         in.close();
         return LoadLegacyEdits(path);
     }
@@ -157,10 +170,10 @@ bool World::LoadEdits(const std::string& path) {
     while (in.read((char*)header, sizeof(header))) {
         auto& chunkEdits = edits[Key(header[0], header[1])];
         for (int32_t n = 0; n < header[2]; n++) {
-            uint16_t index;
-            uint8_t id, meta;
-            if (!in.read((char*)&index, 2) || !in.read((char*)&id, 1) || !in.read((char*)&meta, 1)) return false;
-            if (index < Chunk::SIZE * Chunk::SIZE * Chunk::HEIGHT && id < BLOCK_COUNT) chunkEdits[index] = (uint16_t)(id | (meta & 15) << 8);
+            uint16_t index = 0, id = 0;
+            uint8_t meta = 0;
+            if (!in.read((char*)&index, 2) || !in.read((char*)&id, idBytes) || !in.read((char*)&meta, 1)) return false;
+            if (index < Chunk::SIZE * Chunk::SIZE * Chunk::HEIGHT && BlockExists(id)) chunkEdits[index] = EditValue(id, meta);
         }
     }
     return true;
@@ -177,7 +190,7 @@ bool World::LoadLegacyEdits(const std::string& path) {
             uint16_t index;
             uint8_t type;
             if (!in.read((char*)&index, 2) || !in.read((char*)&type, 1)) return false;
-            if (index < Chunk::SIZE * Chunk::SIZE * Chunk::HEIGHT) chunkEdits[index] = LegacyBlock(type);
+            if (index < Chunk::SIZE * Chunk::SIZE * Chunk::HEIGHT) chunkEdits[index] = EditValue(LegacyBlock(type), 0);
         }
     }
     return true;
@@ -344,7 +357,7 @@ void World::IntegrateFinished(int pcx, int pcz) {
                 int x = index % Chunk::SIZE;
                 int z = (index / Chunk::SIZE) % Chunk::SIZE;
                 int y = index / (Chunk::SIZE * Chunk::SIZE);
-                chunk->SetBlock(x, y, z, (uint8_t)(value & 0xFF), value >> 8);
+                chunk->SetBlock(x, y, z, (BlockId)(value & 0xFFFF), (int)(value >> 16));
             }
             chunk->ComputeLight(); // the edits change its shadows
         }
@@ -509,7 +522,7 @@ void World::Update(Vector3 playerPosition, float dt) {
 
 // ---- Blocks
 
-uint8_t World::GetBlock(int x, int y, int z) const {
+BlockId World::GetBlock(int x, int y, int z) const {
     if (y < 0 || y >= Chunk::HEIGHT) return BLOCK_AIR;
     Chunk* chunk = ChunkAt(x, z);
     if (chunk == nullptr) return BLOCK_AIR;
@@ -540,19 +553,19 @@ bool World::SetBlock(int x, int y, int z, int id, int meta, bool notify) {
     Chunk* chunk = ChunkAt(x, z);
     if (chunk == nullptr) return false;
     int lx = LocalCoord(x), lz = LocalCoord(z);
-    uint8_t old = chunk->GetBlock(lx, y, lz);
+    BlockId old = chunk->GetBlock(lx, y, lz);
     int oldMeta = chunk->GetMeta(lx, y, lz);
     meta &= 15;
     if (old == id && oldMeta == meta) return false;
 
-    chunk->SetBlock(lx, y, lz, (uint8_t)id, meta);
-    edits[Key(ChunkCoord(x), ChunkCoord(z))][EditIndex(lx, y, lz)] = (uint16_t)(id | meta << 8);
+    chunk->SetBlock(lx, y, lz, (BlockId)id, meta);
+    edits[Key(ChunkCoord(x), ChunkCoord(z))][EditIndex(lx, y, lz)] = EditValue(id, meta);
 
     if (old != id) GetBlockDef(old).OnRemoved(*this, x, y, z, oldMeta);
-    if (BlockLightOpacity(old) != BlockLightOpacity((uint8_t)id) || BlockLightValue(old) != BlockLightValue((uint8_t)id)) {
+    if (BlockLightOpacity(old) != BlockLightOpacity((BlockId)id) || BlockLightValue(old) != BlockLightValue((BlockId)id)) {
         Relight(x, y, z);
     }
-    if (old != id && GetBlock(x, y, z) == id) GetBlockDef((uint8_t)id).OnAdded(*this, x, y, z);
+    if (old != id && GetBlock(x, y, z) == id) GetBlockDef((BlockId)id).OnAdded(*this, x, y, z);
     MarkForRender(x, y, z);
     if (notify) NotifyNeighbors(x, y, z, id);
     return true;
@@ -564,9 +577,9 @@ bool World::SetMeta(int x, int y, int z, int meta, bool notify) {
     if (chunk == nullptr) return false;
     int lx = LocalCoord(x), lz = LocalCoord(z);
     meta &= 15;
-    uint8_t id = chunk->GetBlock(lx, y, lz);
+    BlockId id = chunk->GetBlock(lx, y, lz);
     chunk->SetMeta(lx, y, lz, meta);
-    edits[Key(ChunkCoord(x), ChunkCoord(z))][EditIndex(lx, y, lz)] = (uint16_t)(id | meta << 8);
+    edits[Key(ChunkCoord(x), ChunkCoord(z))][EditIndex(lx, y, lz)] = EditValue(id, meta);
     MarkForRender(x, y, z);
     if (notify) NotifyNeighbors(x, y, z, id);
     return true;
@@ -582,7 +595,7 @@ void World::NotifyNeighbors(int x, int y, int z, int id) {
 }
 
 void World::NotifyBlock(int x, int y, int z, int neighborId) {
-    uint8_t id = GetBlock(x, y, z);
+    BlockId id = GetBlock(x, y, z);
     if (id == BLOCK_AIR) return;
     GetBlockDef(id).OnNeighborChanged(*this, x, y, z, neighborId);
 }
@@ -611,7 +624,7 @@ void World::ScheduleTick(int x, int y, int z, int id, int delay) {
 }
 
 void World::BlockEvent(int x, int y, int z, int a, int b) {
-    uint8_t id = GetBlock(x, y, z);
+    BlockId id = GetBlock(x, y, z);
     if (id != BLOCK_AIR) GetBlockDef(id).OnBlockEvent(*this, x, y, z, a, b);
 }
 
@@ -636,7 +649,7 @@ void World::TickScheduled() {
             continue;
         }
         scheduledKeys.erase(TickKey(t.x, t.y, t.z, t.id));
-        uint8_t id = GetBlock(t.x, t.y, t.z);
+        BlockId id = GetBlock(t.x, t.y, t.z);
         if (id == t.id && id != BLOCK_AIR) GetBlockDef(id).OnTick(*this, t.x, t.y, t.z, random);
     }
 }
@@ -658,7 +671,7 @@ void World::TickRandomly() {
             randomTickLcg = randomTickLcg * 3 + 1013904223;
             int r = randomTickLcg >> 2;
             int x = cx * Chunk::SIZE + (r & 15), z = cz * Chunk::SIZE + ((r >> 8) & 15), y = (r >> 16) & (Chunk::HEIGHT - 1);
-            uint8_t id = GetBlock(x, y, z);
+            BlockId id = GetBlock(x, y, z);
             const Block& def = GetBlockDef(id);
             if (def.ticksRandomly) def.OnTick(*this, x, y, z, random);
         }
@@ -688,7 +701,7 @@ void World::RandomDisplayTicks() {
         int x = px + random.NextInt(range) - random.NextInt(range);
         int y = py + random.NextInt(range) - random.NextInt(range);
         int z = pz + random.NextInt(range) - random.NextInt(range);
-        uint8_t id = GetBlock(x, y, z);
+        BlockId id = GetBlock(x, y, z);
         if (id != BLOCK_AIR) GetBlockDef(id).RandomDisplayTick(*this, x, y, z, random);
     }
 }
@@ -797,7 +810,7 @@ void World::Relight(int x, int y, int z) {
     Chunk* chunk = ChunkAt(x, z);
     if (chunk == nullptr) return;
     int lx = LocalCoord(x), lz = LocalCoord(z);
-    uint8_t id = chunk->GetBlock(lx, y, lz);
+    BlockId id = chunk->GetBlock(lx, y, lz);
     int opacity = BlockLightOpacity(id);
     for (int channel = 0; channel < 2; channel++) {
         std::deque<LightCell> removed, refill;
@@ -860,7 +873,7 @@ void World::LightAcrossBorders(int cx, int cz) {
 // ---- Redstone (World.isBlockGettingPowered & co.)
 
 bool World::IsBlockProvidingPowerTo(int x, int y, int z, int side) const {
-    uint8_t id = GetBlock(x, y, z);
+    BlockId id = GetBlock(x, y, z);
     return id != BLOCK_AIR && GetBlockDef(id).IsIndirectlyPoweringTo(*this, x, y, z, side);
 }
 
@@ -872,7 +885,7 @@ bool World::IsBlockGettingPowered(int x, int y, int z) const {
 
 bool World::IsBlockIndirectlyProvidingPowerTo(int x, int y, int z, int side) const {
     if (IsNormalCube(x, y, z)) return IsBlockGettingPowered(x, y, z);
-    uint8_t id = GetBlock(x, y, z);
+    BlockId id = GetBlock(x, y, z);
     return id != BLOCK_AIR && GetBlockDef(id).IsPoweringTo(*this, x, y, z, side);
 }
 
@@ -908,16 +921,16 @@ void World::SpawnParticle(ParticleType type, double x, double y, double z, doubl
 }
 
 void World::BreakEffects(int x, int y, int z, int id, int meta) {
-    const Block& def = GetBlockDef((uint8_t)id);
+    const Block& def = GetBlockDef((BlockId)id);
     PlaySound(BreakSoundEvent(def.sound), x + 0.5, y + 0.5, z + 0.5, (StepSoundVolume(def.sound) + 1.0f) / 2.0f,
               StepSoundPitch(def.sound) * 0.8f);
-    if (particles != nullptr) particles->AddDestroyEffects(*this, x, y, z, (uint8_t)id, meta);
+    if (particles != nullptr) particles->AddDestroyEffects(*this, x, y, z, (BlockId)id, meta);
 }
 
 void World::DropBlockAsItem(int x, int y, int z, int id, int meta, float chance) {
     if (id <= 0) return;
     std::vector<ItemStack> out;
-    GetBlockDef((uint8_t)id).Drops(*this, x, y, z, meta, random, out);
+    GetBlockDef((BlockId)id).Drops(*this, x, y, z, meta, random, out);
     for (const ItemStack& stack : out) {
         if (stack.IsEmpty()) continue;
         if (random.NextFloat() > chance) continue;
@@ -979,7 +992,7 @@ void World::Explode(double x, double y, double z, float power, bool fire) {
                 const float step = 0.3f;
                 for (; strength > 0.0f; strength -= step * 0.75f) {
                     int bx = (int)floor(px), by = (int)floor(py), bz = (int)floor(pz);
-                    uint8_t id = GetBlock(bx, by, bz);
+                    BlockId id = GetBlock(bx, by, bz);
                     if (id != BLOCK_AIR) strength -= (GetBlockDef(id).resistance + 0.3f) * step;
                     if (strength > 0.0f && by >= 0 && by < Chunk::HEIGHT) {
                         if (seen.insert(TileKey(bx, by, bz)).second) destroyed.emplace_back(bx, by, bz);
@@ -1011,7 +1024,7 @@ void World::Explode(double x, double y, double z, float power, bool fire) {
     PlaySound("random.explode", x, y, z, 4.0f, (1.0f + (random.NextFloat() - random.NextFloat()) * 0.2f) * 0.7f);
     for (auto it = destroyed.rbegin(); it != destroyed.rend(); ++it) {
         auto [bx, by, bz] = *it;
-        uint8_t id = GetBlock(bx, by, bz);
+        BlockId id = GetBlock(bx, by, bz);
         double fx = bx + random.NextFloat(), fy = by + random.NextFloat(), fz = bz + random.NextFloat();
         double mx = fx - x, my = fy - y, mz = fz - z;
         double len = std::sqrt(mx * mx + my * my + mz * mz);
@@ -1094,7 +1107,7 @@ RaycastHit World::Raycast(Vector3 origin, Vector3 direction, float maxDistance, 
 
     float t = 0.0f;
     for (int guard = 0; guard < 1024 && t <= maxDistance; guard++) {
-        uint8_t id = GetBlock(cell[0], cell[1], cell[2]);
+        BlockId id = GetBlock(cell[0], cell[1], cell[2]);
         if (id != BLOCK_AIR) {
             const Block& def = GetBlockDef(id);
             int meta = GetMeta(cell[0], cell[1], cell[2]);
@@ -1142,7 +1155,7 @@ void World::CollisionBoxes(const double min[3], const double max[3], std::vector
                     }
                     continue;
                 }
-                uint8_t id = GetBlock(x, y, z);
+                BlockId id = GetBlock(x, y, z);
                 if (id == BLOCK_AIR) continue;
                 local.clear();
                 GetBlockDef(id).CollisionBoxes(*this, x, y, z, local);

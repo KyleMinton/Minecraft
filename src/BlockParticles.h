@@ -21,9 +21,9 @@ public:
     BlockParticles& operator=(const BlockParticles&) = delete;
 
     // The burst when a block breaks: a 4x4x4 grid of chips thrown outward.
-    void AddDestroyEffects(const World& world, int x, int y, int z, uint8_t block, int meta);
+    void AddDestroyEffects(const World& world, int x, int y, int z, BlockId block, int meta);
     // One small chip off the face being mined, once per tick.
-    void AddHitEffect(const World& world, int x, int y, int z, int side, uint8_t block, int meta);
+    void AddHitEffect(const World& world, int x, int y, int z, int side, BlockId block, int meta);
     // World.spawnParticle. For reddust, (mx, my, mz) is the color (0 red = full red).
     void Spawn(ParticleType type, double x, double y, double z, double mx, double my, double mz);
 
@@ -67,7 +67,7 @@ private:
     int fogColorLoc, fogStartLoc, fogEndLoc, fogDensityLoc, cameraPosLoc;
 
     Particle MakeDigging(const World& world, double x, double y, double z, double mx, double my, double mz, int bx, int by, int bz,
-                         uint8_t block, int meta) const;
+                         BlockId block, int meta) const;
     void Add(const Particle& particle);
     void Tick(const World& world);
     void DrawBatch(const Camera3D& camera, const World& world, bool digging) const;

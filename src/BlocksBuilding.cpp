@@ -55,7 +55,7 @@ public:
 
 class StairsBlock final : public Block {
 public:
-    uint8_t model = BLOCK_PLANKS;
+    BlockId model = BLOCK_PLANKS;
     StairsBlock() {
         shape = Shape::Stairs;
         opaqueCube = false;
@@ -160,7 +160,7 @@ public:
     PaneBlock() { SetNotCube(*this, Shape::Pane, Layer::Cutout, 0); }
     static bool Connects(const World& world, int x, int y, int z, int self) {
         int id = world.GetBlock(x, y, z);
-        return BlockIsOpaqueCube((uint8_t)id) || id == self || id == BLOCK_GLASS;
+        return BlockIsOpaqueCube((BlockId)id) || id == self || id == BLOCK_GLASS;
     }
     void CollisionBoxes(const World& world, int x, int y, int z, std::vector<BlockBox>& out) const override {
         bool n = Connects(world, x, y, z - 1, id), s = Connects(world, x, y, z + 1, id);
@@ -245,7 +245,7 @@ public:
         int meta = world.GetMeta(x, y, z);
         if (meta & 8) {
             if (world.GetBlock(x, y - 1, z) != id) world.SetBlock(x, y, z, BLOCK_AIR);
-            else if (neighbor > 0 && GetBlockDef((uint8_t)neighbor).CanProvidePower()) OnNeighborChanged(world, x, y - 1, z, neighbor);
+            else if (neighbor > 0 && GetBlockDef((BlockId)neighbor).CanProvidePower()) OnNeighborChanged(world, x, y - 1, z, neighbor);
             return;
         }
         bool broken = false;
@@ -260,7 +260,7 @@ public:
         }
         if (broken) {
             world.SpawnItem(x, y, z, ItemStack(item, 1));
-        } else if (neighbor > 0 && GetBlockDef((uint8_t)neighbor).CanProvidePower()) {
+        } else if (neighbor > 0 && GetBlockDef((BlockId)neighbor).CanProvidePower()) {
             bool powered = world.IsBlockIndirectlyGettingPowered(x, y, z) || world.IsBlockIndirectlyGettingPowered(x, y + 1, z);
             SetPowered(world, x, y, z, powered);
         }
@@ -336,7 +336,7 @@ public:
             BreakAndDrop(world, x, y, z);
             return;
         }
-        if (neighbor > 0 && GetBlockDef((uint8_t)neighbor).CanProvidePower()) {
+        if (neighbor > 0 && GetBlockDef((BlockId)neighbor).CanProvidePower()) {
             bool powered = world.IsBlockIndirectlyGettingPowered(x, y, z);
             bool open = (meta & 4) != 0;
             if (open != powered) {
@@ -566,7 +566,7 @@ void RegisterBuildingBlocks(BlockRegistry& r) {
 // Stairs copy their base block's properties, so they're added once everything
 // else exists (called last by the registry).
 void RegisterStairs(BlockRegistry& r) {
-    auto stairs = [&](int id, const char* name, uint8_t model) {
+    auto stairs = [&](int id, const char* name, BlockId model) {
         const Block& m = *r.blocks[model];
         auto& b = Props(r.Add<StairsBlock>(id), name, m.texture, m.hardness, m.material, m.sound);
         b.resistance = m.resistance;

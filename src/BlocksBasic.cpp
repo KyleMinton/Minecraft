@@ -78,7 +78,7 @@ public:
     static bool CanFallInto(const World& world, int x, int y, int z) {
         int id = world.GetBlock(x, y, z);
         if (id == BLOCK_AIR || id == BLOCK_FIRE) return true;
-        BlockMaterial material = GetBlockDef((uint8_t)id).material;
+        BlockMaterial material = GetBlockDef((BlockId)id).material;
         return material == BlockMaterial::Water || material == BlockMaterial::Lava;
     }
     void OnAdded(World& world, int x, int y, int z) const override { world.ScheduleTick(x, y, z, id, tickRate); }
@@ -356,7 +356,7 @@ public:
         }
     }
     void OnNeighborChanged(World& world, int x, int y, int z, int neighbor) const override {
-        if (neighbor > 0 && GetBlockDef((uint8_t)neighbor).CanProvidePower() && world.IsBlockIndirectlyGettingPowered(x, y, z)) {
+        if (neighbor > 0 && GetBlockDef((BlockId)neighbor).CanProvidePower() && world.IsBlockIndirectlyGettingPowered(x, y, z)) {
             OnDestroyedByPlayer(world, x, y, z, 1, *world.GetPlayer());
             world.SetBlock(x, y, z, BLOCK_AIR);
         }

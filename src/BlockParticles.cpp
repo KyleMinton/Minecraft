@@ -50,7 +50,7 @@ BlockParticles::~BlockParticles() {
 // EntityFX's constructor then EntityDiggingFX's: the given push plus a random
 // one, at a random speed with an upward kick; a random piece of the texture.
 BlockParticles::Particle BlockParticles::MakeDigging(const World& world, double x, double y, double z, double mx, double my, double mz,
-                                                      int bx, int by, int bz, uint8_t block, int meta) const {
+                                                      int bx, int by, int bz, BlockId block, int meta) const {
     Particle p;
     p.kind = Kind::Digging;
     p.x = p.prevX = x;
@@ -83,7 +83,7 @@ void BlockParticles::Add(const Particle& particle) {
     particles.push_back(particle);
 }
 
-void BlockParticles::AddDestroyEffects(const World& world, int x, int y, int z, uint8_t block, int meta) {
+void BlockParticles::AddDestroyEffects(const World& world, int x, int y, int z, BlockId block, int meta) {
     if (block == BLOCK_AIR) return;
     for (int i = 0; i < GRID; i++)
         for (int j = 0; j < GRID; j++)
@@ -93,7 +93,7 @@ void BlockParticles::AddDestroyEffects(const World& world, int x, int y, int z, 
             }
 }
 
-void BlockParticles::AddHitEffect(const World& world, int x, int y, int z, int side, uint8_t block, int meta) {
+void BlockParticles::AddHitEffect(const World& world, int x, int y, int z, int side, BlockId block, int meta) {
     if (block == BLOCK_AIR) return;
     BlockBox b = GetBlockDef(block).Bounds(world, x, y, z);
     double px = x + RandomFloat() * (b.maxX - b.minX - HIT_INSET * 2.0) + HIT_INSET + b.minX;

@@ -40,9 +40,9 @@ public:
     // Generates the chunk's terrain for the given world seed.
     Chunk(int chunkX, int chunkZ, int64_t seed);
 
-    uint8_t GetBlock(int x, int y, int z) const;
+    BlockId GetBlock(int x, int y, int z) const;
     int GetMeta(int x, int y, int z) const;
-    void SetBlock(int x, int y, int z, uint8_t type, int meta = 0);
+    void SetBlock(int x, int y, int z, BlockId type, int meta = 0);
     void SetMeta(int x, int y, int z, int meta);
 
     // Sky light, 0-15 (Minecraft's skylight): 15 open to the sky, one less per
@@ -75,7 +75,7 @@ private:
     void GenerateTerrain();
     void GenerateFeatures();
     void GenerateTrees();
-    uint8_t StoneOrDeposit(int worldX, int y, int worldZ) const;
+    BlockId StoneOrDeposit(int worldX, int y, int worldZ) const;
     void GenerateDungeons(JavaRandom& random);
     int SurfaceHeight(int worldX, int worldZ) const; // terrain only, for trees reaching in from neighbors
     void ColumnSolids(int worldX, int worldZ, bool solid[]) const;
@@ -88,7 +88,7 @@ private:
     // feature hashes, so each seed is a different world.
     float noiseOffsetX, noiseOffsetZ;
     uint32_t seedHash;
-    uint8_t blocks[SIZE][HEIGHT][SIZE];
+    BlockId blocks[SIZE][HEIGHT][SIZE];
     uint8_t meta[SIZE][HEIGHT][SIZE];
     uint8_t skyLight[SIZE][HEIGHT][SIZE];
     uint8_t blockLight[SIZE][HEIGHT][SIZE];

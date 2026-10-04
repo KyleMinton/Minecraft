@@ -167,7 +167,7 @@ void TileEntityRenderer::DrawChest(const World& world, int x, int y, int z, floa
 
 // TileEntitySignRenderer: the board (and post), then the four lines of text.
 void TileEntityRenderer::DrawSign(const World& world, int x, int y, int z) const {
-    uint8_t id = world.GetBlock(x, y, z);
+    BlockId id = world.GetBlock(x, y, z);
     if (id != BLOCK_SIGN_POST && id != BLOCK_WALL_SIGN) return;
     const TileEntity* te = world.GetTileEntity(x, y, z);
     if (te == nullptr || te->kind != TileKind::Sign) return;
@@ -221,7 +221,7 @@ void TileEntityRenderer::DrawMovingBlock(const World& world, int x, int y, int z
     const TileEntity* te = world.GetTileEntity(x, y, z);
     if (te == nullptr || te->kind != TileKind::Piston) return;
     const PistonTile* moving = static_cast<const PistonTile*>(te);
-    if (moving->storedId <= 0 || moving->storedId >= BLOCK_COUNT) return;
+    if (moving->storedId <= 0 || !BlockExists(moving->storedId)) return;
     float offset = moving->Offset(partial);
     float ox = offset * SIDE_OFFSET[moving->facing][0], oy = offset * SIDE_OFFSET[moving->facing][1], oz = offset * SIDE_OFFSET[moving->facing][2];
     float brightness = Brightness(world, x, y, z);

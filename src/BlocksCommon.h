@@ -14,13 +14,13 @@
 
 // The registry each Blocks*.cpp file adds its blocks to.
 struct BlockRegistry {
-    std::unique_ptr<Block> blocks[256];
+    std::unique_ptr<Block> blocks[MAX_BLOCK_ID];
 
     template <typename T, typename... Args>
     T& Add(int id, Args&&... args) {
         auto block = std::make_unique<T>(std::forward<Args>(args)...);
         T& ref = *block;
-        ref.id = (uint8_t)id;
+        ref.id = (BlockId)id;
         blocks[id] = std::move(block);
         return ref;
     }

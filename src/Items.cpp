@@ -18,12 +18,12 @@ class BlockItemDef final : public ItemDef {
 public:
     explicit BlockItemDef(int blockId) {
         id = (uint16_t)blockId;
-        name = GetBlockDef((uint8_t)blockId).name;
+        name = GetBlockDef((BlockId)blockId).name;
     }
-    std::string DisplayName(int damage) const override { return GetBlockDef((uint8_t)id).DisplayName(damage); }
-    int Icon(int damage) const override { return GetBlockDef((uint8_t)id).ItemIconTexture(damage); }
+    std::string DisplayName(int damage) const override { return GetBlockDef((BlockId)id).DisplayName(damage); }
+    int Icon(int damage) const override { return GetBlockDef((BlockId)id).ItemIconTexture(damage); }
     IconSheet Sheet() const override { return IconSheet::Terrain; }
-    Color Tint(int damage) const override { return GetBlockDef((uint8_t)id).ItemTint(damage); }
+    Color Tint(int damage) const override { return GetBlockDef((BlockId)id).ItemTint(damage); }
     bool UseOnBlock(ItemStack& stack, Player& player, World& world, int x, int y, int z, int side) const override {
         if (world.GetBlock(x, y, z) == BLOCK_SNOW_LAYER) {
             side = SIDE_DOWN;
@@ -32,7 +32,7 @@ public:
             y += SIDE_OFFSET[side][1];
             z += SIDE_OFFSET[side][2];
         }
-        return PlaceBlockFromItem(stack, player, world, x, y, z, side, id, GetBlockDef((uint8_t)id).MetaForPlacement(stack.damage));
+        return PlaceBlockFromItem(stack, player, world, x, y, z, side, id, GetBlockDef((BlockId)id).MetaForPlacement(stack.damage));
     }
 };
 
@@ -88,7 +88,7 @@ public:
     bool UseOnBlock(ItemStack& stack, Player& player, World& world, int x, int y, int z, int side) const override {
         if (side != SIDE_UP) return false;
         y++;
-        const Block& door = GetBlockDef((uint8_t)block);
+        const Block& door = GetBlockDef((BlockId)block);
         if (!door.CanPlaceAt(world, x, y, z)) return false;
         int facing = PlayerDoorFacing(player);
         int dx = 0, dz = 0;
@@ -203,7 +203,7 @@ public:
         bool used = false;
         if (id == BLOCK_SAPLING || id == BLOCK_BROWN_MUSHROOM || id == BLOCK_RED_MUSHROOM || id == BLOCK_WHEAT ||
             id == BLOCK_PUMPKIN_STEM || id == BLOCK_MELON_STEM) {
-            used = GetBlockDef((uint8_t)id).Fertilize(world, x, y, z) || id == BLOCK_BROWN_MUSHROOM || id == BLOCK_RED_MUSHROOM;
+            used = GetBlockDef((BlockId)id).Fertilize(world, x, y, z) || id == BLOCK_BROWN_MUSHROOM || id == BLOCK_RED_MUSHROOM;
         } else if (id == BLOCK_GRASS) {
             JavaRandom& random = world.Random();
             for (int attempt = 0; attempt < 128; attempt++) {
@@ -276,7 +276,8 @@ public:
 };
 
 struct ItemTable {
-    std::array<std::unique_ptr<ItemDef>, 512> items; // 0-255 blocks, 256+ items (records mapped below)
+    // 0-255 Beta's blocks, 256+ items (records mapped below), FIRST_MODERN_BLOCK+ later blocks.
+    std::vector<std::unique_ptr<ItemDef>> items = std::vector<std::unique_ptr<ItemDef>>(MAX_BLOCK_ID);
     std::unique_ptr<ItemDef> record13, recordCat;
 
     template <typename T = ItemDef>
@@ -316,6 +317,9 @@ struct ItemTable {
 
     ItemTable() {
         for (int b = 1; b < BLOCK_COUNT; b++) items[b] = std::make_unique<BlockItemDef>(b);
+        for (int b = FIRST_MODERN_BLOCK; b < MAX_BLOCK_ID; b++) {
+            if (BlockExists(b)) items[b] = std::make_unique<BlockItemDef>(b);
+        }
 
         Tool(ITEM_IRON_SHOVEL, "Iron Shovel", 82, ToolType::Shovel, TIER_IRON);
         Tool(ITEM_IRON_PICKAXE, "Iron Pickaxe", 98, ToolType::Pickaxe, TIER_IRON);
@@ -454,7 +458,7 @@ const ItemDef* GetItemDef(int id) {
     return t.items[id].get();
 }
 
-bool IsBlockItem(int id) { return id > 0 && id < 256; }
+bool IsBlockItem(int id) { return (id > 0 && id < 256) || (id >= FIRST_MODERN_BLOCK && BlockExists(id)); }
 
 int MaxStackSize(const ItemStack& stack) {
     const ItemDef* def = GetItemDef(stack.id);
@@ -468,7 +472,7 @@ std::string ItemName(const ItemStack& stack) {
 
 // ---- Mining
 
-float ToolSpeed(const ItemStack& held, uint8_t block, int meta) {
+float ToolSpeed(const ItemStack& held, BlockId block, int meta) {
     const ItemDef* def = held.IsEmpty() ? nullptr : GetItemDef(held.id);
     if (def == nullptr) return 1.0f;
     const Block& b = GetBlockDef(block);
@@ -501,7 +505,7 @@ float ToolSpeed(const ItemStack& held, uint8_t block, int meta) {
     }
 }
 
-bool CanHarvest(const ItemStack& held, uint8_t block) {
+bool CanHarvest(const ItemStack& held, BlockId block) {
     const Block& b = GetBlockDef(block);
     if (GetMaterialInfo(b.material).harvestable) return true;
     const ItemDef* def = held.IsEmpty() ? nullptr : GetItemDef(held.id);
@@ -540,7 +544,7 @@ bool DamageItem(ItemStack& stack, int amount) {
 
 int FuelTicks(const ItemStack& stack) {
     if (stack.IsEmpty()) return 0;
-    if (IsBlockItem(stack.id) && GetBlockDef((uint8_t)stack.id).material == BlockMaterial::Wood) return 300;
+    if (IsBlockItem(stack.id) && GetBlockDef((BlockId)stack.id).material == BlockMaterial::Wood) return 300;
     if (stack.id == ITEM_STICK) return 100;
     if (stack.id == ITEM_COAL) return 1600;
     if (stack.id == ITEM_LAVA_BUCKET) return 20000;
@@ -571,11 +575,11 @@ ItemStack SmeltingResult(const ItemStack& input) {
 
 bool PlaceBlockFromItem(ItemStack& stack, Player& player, World& world, int x, int y, int z, int side, int blockId, int meta) {
     if (stack.IsEmpty()) return false;
-    const Block& block = GetBlockDef((uint8_t)blockId);
+    const Block& block = GetBlockDef((BlockId)blockId);
     if (y >= Chunk::HEIGHT - 1 && block.BlocksMovement()) return false;
     if (y < 0 || y >= Chunk::HEIGHT) return false;
     int there = world.GetBlock(x, y, z);
-    if (there != BLOCK_AIR && !GetMaterialInfo(GetBlockDef((uint8_t)there).material).replaceable) return false;
+    if (there != BLOCK_AIR && !GetMaterialInfo(GetBlockDef((BlockId)there).material).replaceable) return false;
     if (!block.CanPlaceOnSide(world, x, y, z, side)) return false;
     if (block.BlocksMovement()) {
         double min[3] = { (double)x, (double)y, (double)z }, max[3] = { x + 1.0, y + 1.0, z + 1.0 };

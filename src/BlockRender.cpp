@@ -66,8 +66,8 @@ struct MeshCache {
     float sky[W][H][W], glow[W][H][W];
     int8_t lit[W][H][W];    // light cached?
     int8_t opaque[W][H][W]; // -1 unknown
-    uint8_t ids[W][H][W];   // every block, from y -1 to HEIGHT
-    bool opaqueId[256], greedyId[256];
+    BlockId ids[W][H][W];   // every block, from y -1 to HEIGHT
+    bool opaqueId[MAX_BLOCK_ID], greedyId[MAX_BLOCK_ID];
     bool Index(int x, int y, int z, int& i, int& j, int& k) const {
         i = x - x0 + 1; j = y + 1; k = z - z0 + 1;
         return i >= 0 && j >= 0 && k >= 0 && i < W && j < H && k < W;
@@ -103,7 +103,7 @@ bool CachedOpaque(const World& world, int x, int y, int z) {
 // World.getLightBrightness as rendering sees it: slabs, stairs and farmland
 // block light but aren't full cubes, so they borrow their brightest neighbor's.
 Light2 RenderLightUncached(const World& world, int x, int y, int z) {
-    uint8_t id = world.GetBlock(x, y, z);
+    BlockId id = world.GetBlock(x, y, z);
     if (id != BLOCK_AIR && !BlockIsOpaqueCube(id) && BlockLightOpacity(id) >= MAX_LIGHT) {
         Light2 best{ 0, (float)world.GetBlockLight(x, y, z) };
         for (const auto& o : SIDE_OFFSET) {
@@ -160,7 +160,7 @@ struct Ctx {
     const Block& def;
     Light2 flat;        // light for items/entities
 
-    uint8_t Get(int dx, int dy, int dz) const { return world ? world->GetBlock(x + dx, y + dy, z + dz) : (uint8_t)BLOCK_AIR; }
+    BlockId Get(int dx, int dy, int dz) const { return world ? world->GetBlock(x + dx, y + dy, z + dz) : (BlockId)BLOCK_AIR; }
     int Meta(int dx, int dy, int dz) const { return world ? world->GetMeta(x + dx, y + dy, z + dz) : 0; }
     bool Opaque(int dx, int dy, int dz) const { return world && world->IsOpaqueCube(x + dx, y + dy, z + dz); }
     bool Normal(int dx, int dy, int dz) const { return world && world->IsNormalCube(x + dx, y + dy, z + dz); }
@@ -467,7 +467,7 @@ void RenderFluid(Ctx& c) {
     int sideTex = c.def.Texture(SIDE_NORTH, c.meta);
     Vector2 t = TileUV(sideTex);
     for (const SideInfo& s : sides) {
-        uint8_t n = c.Get(s.dx, 0, s.dz);
+        BlockId n = c.Get(s.dx, 0, s.dz);
         if (n != BLOCK_AIR && GetBlockDef(n).material == material) continue;
         if (c.Opaque(s.dx, 0, s.dz)) continue;
         float u1 = t.x, u2 = t.x + 16 * PX;
@@ -496,7 +496,7 @@ bool WireConnectsTo(const World& world, int x, int y, int z, int dir) {
         int facing = world.GetMeta(x, y, z) & 3;
         return dir == facing || dir == opposite[facing];
     }
-    return GetBlockDef((uint8_t)id).CanProvidePower() && dir != -1;
+    return GetBlockDef((BlockId)id).CanProvidePower() && dir != -1;
 }
 
 void RenderWire(Ctx& c) {
@@ -939,7 +939,7 @@ void RenderPane(Ctx& c) {
     int edge = c.id == BLOCK_GLASS_PANE ? 148 : tex;
     auto connects = [&](int dx, int dz) {
         int id = c.Get(dx, 0, dz);
-        return BlockIsOpaqueCube((uint8_t)id) || id == c.id || id == BLOCK_GLASS;
+        return BlockIsOpaqueCube((BlockId)id) || id == c.id || id == BLOCK_GLASS;
     };
     bool n = false, s = false, w = false, e = false;
     if (c.world) { n = connects(0, -1); s = connects(0, 1); w = connects(-1, 0); e = connects(1, 0); }
@@ -1134,7 +1134,7 @@ void GreedyFaces(const World& world, const Chunk& chunk, MeshBuffer& out) {
     const int dims[3] = { Chunk::SIZE, Chunk::HEIGHT, Chunk::SIZE };
     const int baseX = chunk.GetChunkX() * Chunk::SIZE, baseZ = chunk.GetChunkZ() * Chunk::SIZE;
     const MeshCache& cache = *g_meshCache;
-    auto blockAt = [&](const int l[3]) -> uint8_t { return cache.ids[l[0] + 1][l[1] + 1][l[2] + 1]; };
+    auto blockAt = [&](const int l[3]) -> BlockId { return cache.ids[l[0] + 1][l[1] + 1][l[2] + 1]; };
 
     std::vector<FaceKey> mask;
     for (int side = 0; side < 6; side++) {
@@ -1155,7 +1155,7 @@ void GreedyFaces(const World& world, const Chunk& chunk, MeshBuffer& out) {
                     key.tex = -1;
                     int l[3];
                     l[n] = slice; l[a1] = i; l[a2] = j;
-                    uint8_t id = blockAt(l);
+                    BlockId id = blockAt(l);
                     if (!cache.greedyId[id]) continue;
                     int nl[3] = { l[0] + SIDE_OFFSET[side][0], l[1] + SIDE_OFFSET[side][1], l[2] + SIDE_OFFSET[side][2] };
                     if (nl[1] < 0) continue; // bottom of the world
@@ -1238,7 +1238,7 @@ void GreedyFaces(const World& world, const Chunk& chunk, MeshBuffer& out) {
 } // namespace
 
 void RenderWorldBlock(QuadSink& sink, const World& world, int x, int y, int z, Vector3 origin) {
-    uint8_t id = world.GetBlock(x, y, z);
+    BlockId id = world.GetBlock(x, y, z);
     if (id == BLOCK_AIR) return;
     Ctx c{ sink, &world, x, y, z, Vector3{ x - origin.x, y - origin.y, z - origin.z }, id, world.GetMeta(x, y, z), GetBlockDef(id), Light2{} };
     Render(c);
@@ -1246,7 +1246,7 @@ void RenderWorldBlock(QuadSink& sink, const World& world, int x, int y, int z, V
 
 void RenderBlockModel(QuadSink& sink, int id, int meta, Vector3 offset, float sky, float glow) {
     if (id <= 0 || id >= 256) return;
-    Ctx c{ sink, nullptr, 0, 0, 0, offset, id, meta, GetBlockDef((uint8_t)id), Light2{ sky, glow } };
+    Ctx c{ sink, nullptr, 0, 0, 0, offset, id, meta, GetBlockDef((BlockId)id), Light2{ sky, glow } };
     Render(c);
 }
 
@@ -1270,9 +1270,13 @@ ChunkMeshes BuildChunkMeshes(const World& world, const Chunk& chunk) {
     cache.x0 = chunk.GetChunkX() * Chunk::SIZE;
     cache.z0 = chunk.GetChunkZ() * Chunk::SIZE;
     memset(cache.lit, 0, sizeof(cache.lit));
-    for (int id = 0; id < 256; id++) {
-        cache.opaqueId[id] = BlockIsOpaqueCube((uint8_t)id);
-        cache.greedyId[id] = cache.opaqueId[id] && GetBlockDef((uint8_t)id).shape == Shape::Cube;
+    static bool tablesReady = false; // block definitions never change, so once is enough
+    if (!tablesReady) {
+        for (int id = 0; id < MAX_BLOCK_ID; id++) {
+            cache.opaqueId[id] = BlockIsOpaqueCube((BlockId)id);
+            cache.greedyId[id] = cache.opaqueId[id] && GetBlockDef((BlockId)id).shape == Shape::Cube;
+        }
+        tablesReady = true;
     }
     for (int i = 0; i < MeshCache::W; i++)
         for (int k = 0; k < MeshCache::W; k++) {
@@ -1280,7 +1284,7 @@ ChunkMeshes BuildChunkMeshes(const World& world, const Chunk& chunk) {
             bool inside = lx >= 0 && lz >= 0 && lx < Chunk::SIZE && lz < Chunk::SIZE;
             for (int j = 0; j < MeshCache::H; j++) {
                 int y = j - 1;
-                uint8_t id = BLOCK_AIR;
+                BlockId id = BLOCK_AIR;
                 if (y >= 0 && y < Chunk::HEIGHT) id = inside ? chunk.GetBlock(lx, y, lz) : world.GetBlock(cache.x0 + lx, y, cache.z0 + lz);
                 cache.ids[i][j][k] = id;
                 cache.opaque[i][j][k] = cache.opaqueId[id] ? 1 : 0;
@@ -1294,7 +1298,7 @@ ChunkMeshes BuildChunkMeshes(const World& world, const Chunk& chunk) {
     for (int x = 0; x < Chunk::SIZE; x++) {
         for (int y = 0; y < Chunk::HEIGHT; y++) {
             for (int z = 0; z < Chunk::SIZE; z++) {
-                uint8_t id = cache.ids[x + 1][y + 1][z + 1];
+                BlockId id = cache.ids[x + 1][y + 1][z + 1];
                 if (id == BLOCK_AIR || cache.greedyId[id]) continue; // greedy
                 RenderWorldBlock(sink, world, baseX + x, y, baseZ + z, origin);
             }

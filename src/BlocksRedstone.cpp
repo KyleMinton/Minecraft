@@ -296,7 +296,7 @@ public:
         int id = world.GetBlock(x, y, z);
         if (id == BLOCK_REDSTONE_WIRE) return true;
         if (id == BLOCK_AIR) return false;
-        if (GetBlockDef((uint8_t)id).CanProvidePower() && dir != -1) {
+        if (GetBlockDef((BlockId)id).CanProvidePower() && dir != -1) {
             if (id != BLOCK_UNPOWERED_REPEATER && id != BLOCK_POWERED_REPEATER) return true;
         }
         if (id == BLOCK_UNPOWERED_REPEATER || id == BLOCK_POWERED_REPEATER) {
@@ -960,7 +960,7 @@ public:
                 world.NotifyNeighbors(x, y - 1, z, id);
                 if (shape >= 2 && shape <= 5) world.NotifyNeighbors(x, y + 1, z, id);
             }
-        } else if (neighbor > 0 && GetBlockDef((uint8_t)neighbor).CanProvidePower() && !Straight() &&
+        } else if (neighbor > 0 && GetBlockDef((BlockId)neighbor).CanProvidePower() && !Straight() &&
                    RailLogic(world, x, y, z).AdjacentTracks() == 3) {
             RailLogic(world, x, y, z).RefreshShape(false);
         }

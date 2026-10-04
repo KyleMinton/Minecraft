@@ -83,8 +83,8 @@ bool IsBlockItem(int id);
 
 // Mining: how fast `held` breaks `block` (ItemTool.getStrVsBlock), and whether it
 // gets the drops (canHarvestBlock).
-float ToolSpeed(const ItemStack& held, uint8_t block, int meta);
-bool CanHarvest(const ItemStack& held, uint8_t block);
+float ToolSpeed(const ItemStack& held, BlockId block, int meta);
+bool CanHarvest(const ItemStack& held, BlockId block);
 // Uses up durability; returns false if the tool broke.
 bool DamageItem(ItemStack& stack, int amount);
 

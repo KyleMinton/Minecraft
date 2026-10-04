@@ -11,10 +11,17 @@ class World;
 class Player;
 class JavaRandom;
 
+// A block's ID as chunks and saves store it. Beta's blocks keep Beta's IDs
+// (0-255); blocks from later versions start at FIRST_MODERN_BLOCK, clear of the
+// item IDs (256-2267) that share ItemStack's numbering with blocks.
+using BlockId = uint16_t;
+constexpr int FIRST_MODERN_BLOCK = 4096;
+constexpr int MAX_BLOCK_ID = 8192;
+
 // Every block in Minecraft Beta 1.8, with Beta's block IDs (chunks store these).
 // Each block can also carry 4 bits of metadata: its variant (wool color, wood
 // type, slab kind), facing, growth stage, liquid level, power, and so on.
-enum BlockType : uint8_t {
+enum BlockType : BlockId {
     BLOCK_AIR = 0,
     BLOCK_STONE = 1,
     BLOCK_GRASS = 2,
@@ -178,7 +185,7 @@ struct BlockBox {
 // Minecraft's Block class. Look one up with GetBlockDef(id).
 class Block {
 public:
-    uint8_t id = 0;
+    BlockId id = 0;
     std::string name;          // Beta's English name
     int texture = 0;           // default texture tile
     float hardness = 0.0f;     // negative = unbreakable
@@ -271,13 +278,15 @@ public:
     bool BlocksMovement() const { return GetMaterialInfo(material).solid; }
 };
 
-const Block& GetBlockDef(uint8_t id);
+const Block& GetBlockDef(BlockId id);
+// Is there a block with this ID (anything registered, air included)?
+bool BlockExists(int id);
 
 // Quick lookups the light engine and mesher use a lot.
-int BlockLightOpacity(uint8_t id);
-int BlockLightValue(uint8_t id);
-bool BlockIsOpaqueCube(uint8_t id);
-bool BlockIsNormalCube(uint8_t id);
+int BlockLightOpacity(BlockId id);
+int BlockLightValue(BlockId id);
+bool BlockIsOpaqueCube(BlockId id);
+bool BlockIsNormalCube(BlockId id);
 
 // Beta's step sounds.
 const char* StepSoundEvent(StepSound sound);  // walking and placing: "step.stone", "step.wood", ...

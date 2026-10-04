@@ -44,16 +44,16 @@ int SurfaceY(const World& world, int x, int z) {
     return -1;
 }
 
-bool IsGrass(uint8_t block) { return block == BLOCK_GRASS; }
+bool IsGrass(BlockId block) { return block == BLOCK_GRASS; }
 
 // Dry, solid ground: not water, and not the top of a tree.
-bool IsDryGround(uint8_t block) {
+bool IsDryGround(BlockId block) {
     return GetBlockDef(block).BlocksMovement() && block != BLOCK_LEAVES && block != BLOCK_LOG && block != BLOCK_CACTUS;
 }
 
 // Checks columns in rings outward from the origin; returns the first whose
 // topmost block passes `accept`.
-bool SearchSpawn(const World& world, bool (*accept)(uint8_t), int& x, int& y, int& z) {
+bool SearchSpawn(const World& world, bool (*accept)(BlockId), int& x, int& y, int& z) {
     for (int radius = 0; radius <= SPAWN_SEARCH_RADIUS; radius++) {
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
@@ -391,7 +391,7 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
                 const RaycastHit& target = player.GetTarget();
                 BreakProgress breaking = player.GetBreakProgress();
                 if (breaking.active) {
-                    uint8_t id = world.GetBlock(breaking.x, breaking.y, breaking.z);
+                    BlockId id = world.GetBlock(breaking.x, breaking.y, breaking.z);
                     BlockBox bounds = GetBlockDef(id).Bounds(world, breaking.x, breaking.y, breaking.z);
                     breakOverlay.Draw(breaking.x, breaking.y, breaking.z, breaking.stage, Vector3Subtract(camera.target, camera.position), bounds);
                 }
@@ -400,7 +400,7 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
 
                 // The block outline (RenderGlobal.drawSelectionBox), around its real shape.
                 if (target.hit) {
-                    uint8_t id = world.GetBlock(target.x, target.y, target.z);
+                    BlockId id = world.GetBlock(target.x, target.y, target.z);
                     BlockBox b = GetBlockDef(id).Bounds(world, target.x, target.y, target.z);
                     const float grow = 0.002f;
                     Vector3 center = { target.x + (b.minX + b.maxX) / 2, target.y + (b.minY + b.maxY) / 2, target.z + (b.minZ + b.maxZ) / 2 };

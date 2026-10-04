@@ -91,7 +91,7 @@ public:
     float GetTickAlpha() const { return (float)(tickAccumulator / 0.05); }
 
     // ---- Blocks
-    uint8_t GetBlock(int x, int y, int z) const;
+    BlockId GetBlock(int x, int y, int z) const;
     int GetMeta(int x, int y, int z) const;
     BlockMaterial GetMaterial(int x, int y, int z) const;
     bool IsLoaded(int x, int z) const;
@@ -201,8 +201,8 @@ private:
     int streamedDistance = 0; // the render distance the loaded area was streamed for
     int64_t seed;
     std::unordered_map<int64_t, LoadedChunk> chunks;
-    // Changed blocks per chunk key: local block index -> id | meta << 8.
-    std::unordered_map<int64_t, std::unordered_map<int, uint16_t>> edits;
+    // Changed blocks per chunk key: local block index -> id | meta << 16.
+    std::unordered_map<int64_t, std::unordered_map<int, uint32_t>> edits;
     std::unordered_map<int64_t, std::unique_ptr<TileEntity>> tileEntities; // by block position key
     std::unordered_set<int64_t> tilesPopulated; // chunks whose generated chests/spawners have been made
     std::unordered_set<int64_t> dirtyChunks;    // meshed chunks to rebuild this frame

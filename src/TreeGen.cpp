@@ -10,7 +10,7 @@
 namespace {
 
 bool OpaqueAt(const TreeWorld& world, int x, int y, int z) {
-    return BlockIsOpaqueCube((uint8_t)world.Get(x, y, z));
+    return BlockIsOpaqueCube((BlockId)world.Get(x, y, z));
 }
 
 // The trunk and small round canopy shared by oak and birch (WorldGenTrees / WorldGenForest).

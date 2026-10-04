@@ -104,8 +104,8 @@ void Entities::Tick(World& world) {
         int bx = (int)floor(e.x), by = (int)floor(e.y), bz = (int)floor(e.z);
         if (e.onGround) {
             e.dead = true;
-            const Block& def = GetBlockDef((uint8_t)e.id);
-            uint8_t there = world.GetBlock(bx, by, bz);
+            const Block& def = GetBlockDef((BlockId)e.id);
+            BlockId there = world.GetBlock(bx, by, bz);
             bool replaceable = there == BLOCK_AIR || GetMaterialInfo(GetBlockDef(there).material).replaceable;
             if (replaceable && def.CanPlaceAt(world, bx, by, bz) && world.SetBlock(bx, by, bz, e.id, e.meta)) continue;
             world.SpawnItem(bx, by, bz, ItemStack(e.id, 1, e.meta));

@@ -189,7 +189,7 @@ public:
         return true;
     }
     void OnNeighborChanged(World& world, int x, int y, int z, int neighbor) const override {
-        if (neighbor > 0 && GetBlockDef((uint8_t)neighbor).CanProvidePower()) {
+        if (neighbor > 0 && GetBlockDef((BlockId)neighbor).CanProvidePower()) {
             if (world.IsBlockIndirectlyGettingPowered(x, y, z) || world.IsBlockIndirectlyGettingPowered(x, y + 1, z)) {
                 world.ScheduleTick(x, y, z, id, tickRate);
             }
@@ -311,7 +311,7 @@ public:
         world.BlockEvent(x, y, z, instrument, tile->note);
     }
     void OnNeighborChanged(World& world, int x, int y, int z, int neighbor) const override {
-        if (neighbor <= 0 || !GetBlockDef((uint8_t)neighbor).CanProvidePower()) return;
+        if (neighbor <= 0 || !GetBlockDef((BlockId)neighbor).CanProvidePower()) return;
         bool powered = world.IsBlockGettingPowered(x, y, z);
         NoteBlockTile* tile = Tile(world, x, y, z);
         if (tile == nullptr || tile->previouslyPowered == powered) return;

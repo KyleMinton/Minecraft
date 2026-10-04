@@ -77,7 +77,7 @@ public:
         int there = world.GetBlock(x, y, z);
         if (there == BLOCK_WOODEN_DOOR || there == BLOCK_IRON_DOOR || there == BLOCK_SIGN_POST || there == BLOCK_LADDER || there == BLOCK_REEDS) return true;
         if (there == BLOCK_AIR) return false;
-        return GetBlockDef((uint8_t)there).BlocksMovement();
+        return GetBlockDef((BlockId)there).BlocksMovement();
     }
     bool CanDisplace(const World& world, int x, int y, int z) const {
         BlockMaterial there = world.GetMaterial(x, y, z);
@@ -225,7 +225,7 @@ public:
                     world.SetBlock(x, y, z, BLOCK_FIRE);
                     return;
                 }
-            } else if (GetBlockDef((uint8_t)there).BlocksMovement()) {
+            } else if (GetBlockDef((BlockId)there).BlocksMovement()) {
                 return;
             }
         }

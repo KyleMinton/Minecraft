@@ -201,7 +201,7 @@ void DroppedItems::Tick(const World& world, Player& player, SoundSystem& sounds)
 
         double friction = DRAG;
         if (item.onGround) {
-            uint8_t below = world.GetBlock((int)floor(item.x), (int)floor(item.y) - 1, (int)floor(item.z));
+            BlockId below = world.GetBlock((int)floor(item.x), (int)floor(item.y) - 1, (int)floor(item.z));
             friction = (below == BLOCK_AIR ? 0.6f : GetBlockDef(below).slipperiness) * DRAG;
         }
         item.motionX *= friction;
@@ -356,7 +356,7 @@ void DroppedItems::DrawItem(const Item& item, double x, double y, double z, floa
     int copies = ModelCount(stack.count);
 
     if (ItemModels::Is3D(stack)) {
-        const Block& def = GetBlockDef((uint8_t)stack.id);
+        const Block& def = GetBlockDef((BlockId)stack.id);
         bool cube = def.shape == Shape::Cube || def.shape == Shape::PistonBase;
         float scale = cube ? CUBE_SCALE : MODEL_SCALE;
         const Mesh& mesh = models.BlockModel(stack.id, ItemRenderMeta(stack));

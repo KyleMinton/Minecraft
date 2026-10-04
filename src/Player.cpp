@@ -814,7 +814,7 @@ HandPose Player::GetHandPose() const {
 
 bool Player::IsOnLadder(const World& world) const {
     int x = (int)floor(posX), y = (int)floor(posY), z = (int)floor(posZ);
-    uint8_t id = world.GetBlock(x, y, z);
+    BlockId id = world.GetBlock(x, y, z);
     return id != BLOCK_AIR && GetBlockDef(id).IsLadder(world.GetMeta(x, y, z));
 }
 
@@ -852,7 +852,7 @@ void Player::MoveWithHeadingNormal(World& world, double strafe, double forward, 
 
     double friction = AIR_FRICTION;
     if (onGround) {
-        uint8_t below = world.GetBlock((int)floor(posX), (int)floor(posY) - 1, (int)floor(posZ));
+        BlockId below = world.GetBlock((int)floor(posX), (int)floor(posY) - 1, (int)floor(posZ));
         friction = (below == BLOCK_AIR ? 0.6f : GetBlockDef(below).slipperiness) * AIR_FRICTION;
     }
     double accel = onGround ? (sprinting ? SPRINT_SPEED : WALK_SPEED) * (0.16277136 / (friction * friction * friction)) : airAccel;
@@ -928,7 +928,7 @@ void Player::MoveEntity(World& world, double dx, double dy, double dz, SoundSyst
     if (r.collidedZ) motionZ = 0.0;
 
     int fx = (int)floor(posX), fy = (int)floor(posY - 0.2), fz = (int)floor(posZ);
-    uint8_t under = world.GetBlock(fx, fy, fz);
+    BlockId under = world.GetBlock(fx, fy, fz);
     if (under == BLOCK_AIR && world.GetBlock(fx, fy - 1, fz) == BLOCK_FENCE) under = BLOCK_FENCE;
 
     if (onGround) {
@@ -979,7 +979,7 @@ void Player::CollideWithBlocks(World& world) {
     for (int x = x0; x <= x1; x++)
         for (int y = y0; y <= y1; y++)
             for (int z = z0; z <= z1; z++) {
-                uint8_t id = world.GetBlock(x, y, z);
+                BlockId id = world.GetBlock(x, y, z);
                 if (id != BLOCK_AIR) GetBlockDef(id).OnPlayerCollided(world, x, y, z, *this);
             }
 }
@@ -1079,7 +1079,7 @@ void Player::UpdateInteraction(World& world, SoundSystem& sounds, DroppedItems& 
     target = world.Raycast(camera.position, look, reach);
 
     if (gameMode == GameMode::Creative && target.hit && IsMouseButtonPressed(MOUSE_BUTTON_MIDDLE)) {
-        uint8_t id = world.GetBlock(target.x, target.y, target.z);
+        BlockId id = world.GetBlock(target.x, target.y, target.z);
         PickBlock(GetBlockDef(id).PickItem(world, target.x, target.y, target.z));
     }
 
@@ -1108,7 +1108,7 @@ void Player::UseItem(World& world, SoundSystem& sounds) {
     if (useTicks >= 0) return;
     ItemStack& held = inventory.main[selectedSlot];
     if (target.hit) {
-        uint8_t id = world.GetBlock(target.x, target.y, target.z);
+        BlockId id = world.GetBlock(target.x, target.y, target.z);
         if (id != BLOCK_AIR && !sneaking && GetBlockDef(id).OnActivated(world, target.x, target.y, target.z, *this)) {
             Swing();
             return;
@@ -1189,7 +1189,7 @@ void Player::StopBreaking() {
 
 // Block.blockStrength: the held tool's speed on it, over its hardness; blocks
 // that need a tool you don't have take more than three times as long.
-float Player::BreakDamagePerTick(const World& world, uint8_t block, int meta) const {
+float Player::BreakDamagePerTick(const World& world, BlockId block, int meta) const {
     const Block& def = GetBlockDef(block);
     if (def.hardness < 0.0f) return 0.0f;
     const ItemStack& held = HeldItem();
@@ -1203,7 +1203,7 @@ float Player::BreakDamagePerTick(const World& world, uint8_t block, int meta) co
 // PlayerControllerSP.sendBlockRemoved and onPlayerDestroyBlock.
 void Player::BreakBlock(World& world, int x, int y, int z, DroppedItems& drops) {
     (void)drops;
-    uint8_t id = world.GetBlock(x, y, z);
+    BlockId id = world.GetBlock(x, y, z);
     int meta = world.GetMeta(x, y, z);
     if (id == BLOCK_AIR) return;
     const Block& def = GetBlockDef(id);
@@ -1248,7 +1248,7 @@ void Player::BreakTick(World& world, SoundSystem& sounds, DroppedItems& drops, B
     // Creative: a click breaks the block instantly; holding breaks another every 5 ticks.
     if (gameMode == GameMode::Creative) {
         auto breakTarget = [&]() {
-            uint8_t id = world.GetBlock(target.x, target.y, target.z);
+            BlockId id = world.GetBlock(target.x, target.y, target.z);
             if (id == BLOCK_AIR) return;
             GetBlockDef(id).OnClicked(world, target.x, target.y, target.z, *this);
             if (world.GetBlock(target.x, target.y, target.z) != id) return;
@@ -1278,7 +1278,7 @@ void Player::BreakTick(World& world, SoundSystem& sounds, DroppedItems& drops, B
         breakZ = target.z;
         if (!justClicked) return;
         // Clicking a block (Block.onBlockClicked): doors open, TNT lights, notes play...
-        uint8_t id = world.GetBlock(breakX, breakY, breakZ);
+        BlockId id = world.GetBlock(breakX, breakY, breakZ);
         if (id != BLOCK_AIR) {
             GetBlockDef(id).OnClicked(world, breakX, breakY, breakZ, *this);
             if (world.GetBlock(breakX, breakY, breakZ) != id) {
@@ -1295,7 +1295,7 @@ void Player::BreakTick(World& world, SoundSystem& sounds, DroppedItems& drops, B
         }
     }
 
-    uint8_t id = world.GetBlock(breakX, breakY, breakZ);
+    BlockId id = world.GetBlock(breakX, breakY, breakZ);
     if (id == BLOCK_AIR) {
         StopBreaking();
         return;

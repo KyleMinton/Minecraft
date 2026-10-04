@@ -87,7 +87,7 @@ public:
 
     static bool CanPush(int id, const World& world, int x, int y, int z, bool allowBreaking) {
         if (id == BLOCK_OBSIDIAN) return false;
-        const Block& block = GetBlockDef((uint8_t)id);
+        const Block& block = GetBlockDef((BlockId)id);
         if (id == BLOCK_PISTON || id == BLOCK_STICKY_PISTON) {
             if (IsExtended(world.GetMeta(x, y, z))) return false;
         } else {
@@ -106,7 +106,7 @@ public:
             int id = world.GetBlock(nx, ny, nz);
             if (id == BLOCK_AIR) break;
             if (!CanPush(id, world, nx, ny, nz, true)) return false;
-            if (GetBlockDef((uint8_t)id).PistonMobility(world.GetMeta(nx, ny, nz)) == 1) break;
+            if (GetBlockDef((BlockId)id).PistonMobility(world.GetMeta(nx, ny, nz)) == 1) break;
             if (count == 12) return false;
             nx += SIDE_OFFSET[facing][0];
             ny += SIDE_OFFSET[facing][1];
@@ -134,7 +134,7 @@ public:
             int id = world.GetBlock(nx, ny, nz);
             if (id == BLOCK_AIR) break;
             if (!CanPush(id, world, nx, ny, nz, true)) return false;
-            if (GetBlockDef((uint8_t)id).PistonMobility(world.GetMeta(nx, ny, nz)) == 1) {
+            if (GetBlockDef((BlockId)id).PistonMobility(world.GetMeta(nx, ny, nz)) == 1) {
                 world.DropBlockAsItem(nx, ny, nz, id, world.GetMeta(nx, ny, nz));
                 world.SetBlock(nx, ny, nz, BLOCK_AIR);
                 break;
@@ -191,7 +191,7 @@ public:
                         }
                     }
                 }
-                const Block& pulledBlock = GetBlockDef((uint8_t)pulled);
+                const Block& pulledBlock = GetBlockDef((BlockId)pulled);
                 if (!wasMoving && pulled > 0 && CanPush(pulled, world, px, py, pz, false) &&
                     (pulledBlock.PistonMobility(pulledMeta) == 0 || pulled == BLOCK_PISTON || pulled == BLOCK_STICKY_PISTON)) {
                     g_ignorePistonUpdates = false;
@@ -271,7 +271,7 @@ public:
         int bx = x + SIDE_OFFSET[back][0], by = y + SIDE_OFFSET[back][1], bz = z + SIDE_OFFSET[back][2];
         int base = world.GetBlock(bx, by, bz);
         if (base != BLOCK_PISTON && base != BLOCK_STICKY_PISTON) world.SetBlock(x, y, z, BLOCK_AIR);
-        else GetBlockDef((uint8_t)base).OnNeighborChanged(world, bx, by, bz, neighbor);
+        else GetBlockDef((BlockId)base).OnNeighborChanged(world, bx, by, bz, neighbor);
     }
 };
 
@@ -303,7 +303,7 @@ public:
         TileEntity* te = world.GetTileEntity(x, y, z);
         if (te == nullptr || te->kind != TileKind::Piston) return;
         const PistonTile* moving = static_cast<const PistonTile*>(te);
-        GetBlockDef((uint8_t)moving->storedId).Drops(world, x, y, z, moving->storedMeta, random, out);
+        GetBlockDef((BlockId)moving->storedId).Drops(world, x, y, z, moving->storedMeta, random, out);
     }
     // Collision: the stored block, shifted to where it is now.
     void CollisionBoxes(const World& world, int x, int y, int z, std::vector<BlockBox>& out) const override {

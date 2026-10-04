@@ -58,7 +58,7 @@ constexpr uint32_t BEDROCK_SEED = 4242u;
 // wherever it exceeds `threshold` (and y <= maxY), stone becomes that block.
 // Checked in order, so rarer deep ores win over common ones where they overlap.
 struct Deposit {
-    uint8_t type;
+    BlockId type;
     int maxY;
     float threshold; // higher = rarer
     float scale;     // higher = smaller blobs
@@ -77,12 +77,12 @@ constexpr Deposit DEPOSITS[] = {
 };
 
 // Blocks laid under a surface block, top to bottom, before stone takes over.
-constexpr uint8_t GRASS_LAYERS[] = { BLOCK_DIRT, BLOCK_DIRT, BLOCK_DIRT };
-constexpr uint8_t BEACH_LAYERS[] = { BLOCK_SAND, BLOCK_SAND, BLOCK_SANDSTONE, BLOCK_SANDSTONE };
-constexpr uint8_t SEABED_LAYERS[] = { BLOCK_GRAVEL, BLOCK_GRAVEL };
+constexpr BlockId GRASS_LAYERS[] = { BLOCK_DIRT, BLOCK_DIRT, BLOCK_DIRT };
+constexpr BlockId BEACH_LAYERS[] = { BLOCK_SAND, BLOCK_SAND, BLOCK_SANDSTONE, BLOCK_SANDSTONE };
+constexpr BlockId SEABED_LAYERS[] = { BLOCK_GRAVEL, BLOCK_GRAVEL };
 
 // The top block of a column whose highest solid block is at `y`.
-uint8_t SurfaceBlock(int y, int biome) {
+BlockId SurfaceBlock(int y, int biome) {
     if (y > Chunk::SEA_LEVEL + 1) return biome == BIOME_DESERT ? BLOCK_SAND : BLOCK_GRASS;
     if (y >= Chunk::SEA_LEVEL - 3) return BLOCK_SAND;
     return BLOCK_GRAVEL;
@@ -104,7 +104,7 @@ int64_t ChunkSeed(int64_t worldSeed, int cx, int cz, int64_t salt) {
     return ((int64_t)cx * a + (int64_t)cz * b) ^ worldSeed ^ salt;
 }
 
-bool IsSolid(uint8_t id) { return GetMaterialInfo(GetBlockDef(id).material).solid; }
+bool IsSolid(BlockId id) { return GetMaterialInfo(GetBlockDef(id).material).solid; }
 
 // Beta's pickCheckLootItem (WorldGenDungeons).
 ItemStack DungeonLoot(JavaRandom& r) {
@@ -127,7 +127,7 @@ ItemStack DungeonLoot(JavaRandom& r) {
 
 } // namespace
 
-uint8_t Chunk::StoneOrDeposit(int worldX, int y, int worldZ) const {
+BlockId Chunk::StoneOrDeposit(int worldX, int y, int worldZ) const {
     for (const Deposit& d : DEPOSITS) {
         if (y > d.maxY) continue;
         float n = stb_perlin_noise3((worldX + noiseOffsetX + d.offset) * d.scale, (y + d.offset) * d.scale,
@@ -205,7 +205,7 @@ void Chunk::GenerateTerrain() {
             int biome = Climate(worldX, worldZ);
 
             bool foundSurface = false;
-            const uint8_t* layers = nullptr;
+            const BlockId* layers = nullptr;
             int layerCount = 0;
             int layerIndex = 0;
             bool prevWasOpen = true; // above the top of the chunk is open sky
@@ -216,7 +216,7 @@ void Chunk::GenerateTerrain() {
                 bool bedrock = y == 0 ||
                     (s && y <= 3 && HashCoords(worldX * 31 + y, worldZ, BEDROCK_SEED ^ seedHash) % 4 < (uint32_t)(4 - y));
 
-                uint8_t type;
+                BlockId type;
                 if (bedrock) {
                     type = BLOCK_BEDROCK;
                 } else if (s) {
@@ -270,16 +270,17 @@ namespace {
 
 struct ColumnInfo {
     int surface;
-    uint8_t top;
+    BlockId top;
     int biome;
 };
 
 using ColumnFn = void (*)(const Chunk&, int, int, ColumnInfo&);
-using BlockGrid = uint8_t (*)[Chunk::HEIGHT][Chunk::SIZE];
+using BlockGrid = BlockId (*)[Chunk::HEIGHT][Chunk::SIZE];
+using MetaGrid = uint8_t (*)[Chunk::HEIGHT][Chunk::SIZE];
 
 class GenTreeWorld final : public TreeWorld {
 public:
-    GenTreeWorld(const Chunk& c, std::unordered_map<int64_t, ColumnInfo>& cache, BlockGrid b, BlockGrid m, ColumnFn fn)
+    GenTreeWorld(const Chunk& c, std::unordered_map<int64_t, ColumnInfo>& cache, BlockGrid b, MetaGrid m, ColumnFn fn)
         : chunk(c), columns(cache), blocks(b), meta(m), column(fn) {}
 
     int Get(int x, int y, int z) const override {
@@ -298,7 +299,7 @@ public:
         overlay[Key(x, y, z)] = id;
         int lx = x - chunk.GetChunkX() * Chunk::SIZE, lz = z - chunk.GetChunkZ() * Chunk::SIZE;
         if (lx < 0 || lz < 0 || lx >= Chunk::SIZE || lz >= Chunk::SIZE) return;
-        blocks[lx][y][lz] = (uint8_t)id;
+        blocks[lx][y][lz] = (BlockId)id;
         meta[lx][y][lz] = (uint8_t)m;
     }
 
@@ -321,7 +322,7 @@ private:
     const Chunk& chunk;
     std::unordered_map<int64_t, ColumnInfo>& columns;
     BlockGrid blocks;
-    BlockGrid meta;
+    MetaGrid meta;
     ColumnFn column;
     std::unordered_map<int64_t, int> overlay;
 };
@@ -389,7 +390,7 @@ void Chunk::GenerateDungeons(JavaRandom& r) {
         int cx = r.NextInt(8) + 4, cy = r.NextInt(HEIGHT - 8) + 2, cz = r.NextInt(8) + 4;
         const int height = 3;
         int rx = r.NextInt(2) + 2, rz = r.NextInt(2) + 2;
-        auto at = [&](int x, int y, int z) -> uint8_t {
+        auto at = [&](int x, int y, int z) -> BlockId {
             if (x < 0 || z < 0 || x >= SIZE || z >= SIZE || y < 0 || y >= HEIGHT) return BLOCK_AIR;
             return blocks[x][y][z];
         };
@@ -476,7 +477,7 @@ void Chunk::GenerateFeatures() {
                     for (int dy = -1; dy <= 0; dy++) {
                         int px = x + dx, py = floor + dy, pz = z + dz;
                         if (!inside(px, py, pz)) continue;
-                        uint8_t b = blocks[px][py][pz];
+                        BlockId b = blocks[px][py][pz];
                         if (b == BLOCK_SAND || b == BLOCK_GRAVEL || b == BLOCK_DIRT) blocks[px][py][pz] = BLOCK_CLAY;
                     }
                 }
@@ -522,7 +523,7 @@ void Chunk::GenerateFeatures() {
     };
     for (int kind = 0; kind < 2; kind++) {
         if (r.NextInt(kind == 0 ? 4 : 8) != 0) continue;
-        uint8_t mushroom = kind == 0 ? BLOCK_BROWN_MUSHROOM : BLOCK_RED_MUSHROOM;
+        BlockId mushroom = kind == 0 ? BLOCK_BROWN_MUSHROOM : BLOCK_RED_MUSHROOM;
         scatter(64, 8, [&](int x, int y, int z) {
             if (BlockIsOpaqueCube(blocks[x][y - 1][z]) && shaded(x, y, z)) blocks[x][y][z] = mushroom;
         });
@@ -531,14 +532,14 @@ void Chunk::GenerateFeatures() {
     // Sugar cane beside water (WorldGenReed).
     for (int i = 0; i < 10; i++) {
         scatter(20, 4, [&](int x, int y, int z) {
-            uint8_t ground = blocks[x][y - 1][z];
+            BlockId ground = blocks[x][y - 1][z];
             if (ground != BLOCK_GRASS && ground != BLOCK_DIRT && ground != BLOCK_SAND) return;
             bool water = false;
             const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
             for (const auto& o : d) {
                 int nx = x + o[0], nz = z + o[1];
                 if (nx < 0 || nz < 0 || nx >= SIZE || nz >= SIZE) continue;
-                uint8_t n = blocks[nx][y - 1][nz];
+                BlockId n = blocks[nx][y - 1][nz];
                 if (n == BLOCK_WATER || n == BLOCK_FLOWING_WATER) water = true;
             }
             if (!water) return;
@@ -562,7 +563,7 @@ void Chunk::GenerateFeatures() {
                 for (int k = 0; k < h; k++) {
                     int yy = y + k;
                     if (yy >= HEIGHT - 1 || blocks[x][yy][z] != BLOCK_AIR) break;
-                    uint8_t below = blocks[x][yy - 1][z];
+                    BlockId below = blocks[x][yy - 1][z];
                     if (below != BLOCK_SAND && below != BLOCK_CACTUS) break;
                     bool clear = true;
                     const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
@@ -586,7 +587,7 @@ void Chunk::GenerateFeatures() {
             if (Climate(chunkX * SIZE + x, chunkZ * SIZE + z) != BIOME_TAIGA) continue;
             int y = TopY(blocks, x, z);
             if (y < 0 || y >= HEIGHT - 1) continue;
-            uint8_t top = blocks[x][y][z];
+            BlockId top = blocks[x][y][z];
             if (top == BLOCK_WATER) { blocks[x][y][z] = BLOCK_ICE; continue; }
             if (BlockIsOpaqueCube(top) || top == BLOCK_LEAVES) blocks[x][y + 1][z] = BLOCK_SNOW_LAYER;
         }
@@ -595,7 +596,7 @@ void Chunk::GenerateFeatures() {
 
 // ---- Access
 
-uint8_t Chunk::GetBlock(int x, int y, int z) const {
+BlockId Chunk::GetBlock(int x, int y, int z) const {
     if (x < 0 || y < 0 || z < 0 || x >= SIZE || y >= HEIGHT || z >= SIZE) return 0;
     return blocks[x][y][z];
 }
@@ -605,7 +606,7 @@ int Chunk::GetMeta(int x, int y, int z) const {
     return meta[x][y][z];
 }
 
-void Chunk::SetBlock(int x, int y, int z, uint8_t type, int m) {
+void Chunk::SetBlock(int x, int y, int z, BlockId type, int m) {
     if (x < 0 || y < 0 || z < 0 || x >= SIZE || y >= HEIGHT || z >= SIZE) return;
     blocks[x][y][z] = type;
     meta[x][y][z] = (uint8_t)(m & 15);

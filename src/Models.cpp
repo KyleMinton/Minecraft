@@ -150,7 +150,7 @@ ItemModels::~ItemModels() {
 }
 
 bool ItemModels::Is3D(const ItemStack& stack) {
-    return IsBlockItem(stack.id) && GetBlockDef((uint8_t)stack.id).RendersAs3DItem();
+    return IsBlockItem(stack.id) && GetBlockDef((BlockId)stack.id).RendersAs3DItem();
 }
 
 const Mesh& ItemModels::BlockModel(int id, int meta) const {
