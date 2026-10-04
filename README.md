@@ -1,6 +1,6 @@
 # RaylibApp
 
-A Minecraft Beta 1.8 clone in C++ with [raylib](https://www.raylib.com/) 5.5.
+A Minecraft 1.21 clone in C++ with [raylib](https://www.raylib.com/) 5.5.
 
 The game is split in two:
 
