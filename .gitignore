@@ -1,2 +1,7 @@
 build/
 saves/
+
+# Mojang's textures, sounds and music: made from your own copy of Minecraft (see README).
+resources/textures/
+resources/sounds/*
+!resources/sounds/README.txt

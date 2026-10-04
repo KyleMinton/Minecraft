@@ -15,6 +15,8 @@ The game is split in two:
 - **CMake 3.16 or newer** (`cmake --version`)
 - **Git**, which CMake uses to download raylib
 - An internet connection the first time you configure the project
+- **Minecraft Java Edition** (1.21, and Beta 1.8's sounds): the textures and
+  sounds are Mojang's and aren't in this repository; see [Game assets](#game-assets)
 
 ## Building
 
@@ -92,13 +94,23 @@ worlds from an old `saves/` folder in the directory it was started from.
 
 Settings from the Options menu are saved in `%APPDATA%\RaylibApp\options.txt`.
 
-## Textures
+## Game assets
 
-The textures in `resources/textures` are Minecraft 1.21's, laid out the way the
-game reads them (Beta-style `terrain.png`, `items.png` and `particles.png`
-atlases). `tools/ModernTextures.cpp` builds them from an unpacked 1.21 jar,
-and copies the title panorama from the launcher's downloaded assets. To rebuild
-them (for example after changing which tile a block uses):
+The textures, sounds and music are Mojang's, so they aren't in this repository
+(`resources/textures` and `resources/sounds` are git-ignored). Make them from
+your own copy of Minecraft.
+
+### Textures
+
+The game uses Minecraft 1.21's textures, laid out the way it reads them
+(Beta-style `terrain.png`, `items.png` and `particles.png` atlases).
+`tools/ModernTextures.cpp` builds them:
+
+1. Run Minecraft 1.21 once from the launcher, so its files are downloaded.
+2. Unzip `.minecraft/versions/1.21/1.21.jar` (it's a zip file) into a folder
+   named `.minecraft/versions/1.21/1.21`, so that
+   `.minecraft/versions/1.21/1.21/assets/minecraft/textures` exists.
+3. Build and run the tool from the project folder:
 
 ```bash
 cmake --build build --config Release --target ModernTextures
@@ -107,6 +119,18 @@ cmake --build build --config Release --target ModernTextures
 ```bash
 ./build/Release/ModernTextures.exe "C:/Users/<you>/AppData/Roaming/.minecraft/versions/1.21/1.21/assets/minecraft" resources
 ```
+
+It also copies the title-screen panorama from the launcher's downloads. Run it
+again after changing which tile a block uses. A few things 1.21 has no texture
+for (the sides of beds, the bed item) come out blank.
+
+### Sounds and music
+
+Sounds go in `resources/sounds`, named as `resources/sounds/README.txt`
+describes: Minecraft Beta 1.8's sound files, and its music in
+`resources/sounds/music`. The title-screen music (1.21's `menu1.ogg` to
+`menu4.ogg`) goes in `resources/sounds/music/menu`. The game runs without any
+of them, silently.
 
 ## Blocks after Beta
 
