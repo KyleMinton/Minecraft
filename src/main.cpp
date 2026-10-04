@@ -35,6 +35,7 @@ constexpr int SPAWN_ORIGIN_X = 8;
 constexpr int SPAWN_ORIGIN_Z = 8;
 constexpr int SPAWN_SEARCH_RADIUS = 60; // blocks; stays inside the area LoadAround() generates
 constexpr long long DAY_TICKS = 24000;
+constexpr int MENU_FPS = 60; // menus' frame rate cap (1.21's Minecraft.getFramerateLimit)
 
 // Height of the topmost non-air block in a column, or -1 if it's all air.
 int SurfaceY(const World& world, int x, int z) {
@@ -132,7 +133,6 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
     auto applyOptions = [&]() {
         sounds.SetVolumes(options.music, options.sound);
         g_guiScaleSetting = options.guiScale;
-        SetTargetFPS(options.maxFramerate);
         World::SetRenderDistance(options.renderDistance);
         sky.SetFarPlane(World::ViewDistance());
     };
@@ -220,7 +220,18 @@ void RunGame(Texture2D atlasTexture, bool hasTexture) {
 
     bool quit = false;
     bool showOverlay = true; // the controls line and FPS; F3 toggles them
+    int targetFps = -1;
     while (!WindowShouldClose() && !quit) {
+        // Menus are cheap to draw, so uncapped they'd spin the GPU flat out at
+        // thousands of frames a second (blurring the backdrop every one); like
+        // 1.21 they're held to 60. Playing goes as fast as Max Framerate allows.
+        bool inMenu = !worldPtr || pauseMenu.IsOpen() || optionsScreen.IsOpen();
+        int fps = options.maxFramerate;
+        if (inMenu) fps = fps == 0 ? MENU_FPS : std::min(fps, MENU_FPS);
+        if (fps != targetFps) {
+            SetTargetFPS(fps);
+            targetFps = fps;
+        }
         sounds.SetMenuMusic(!worldPtr); // title, world list and options away from a world
         sounds.Update(GetFrameTime());
         backdrop.Update(GetFrameTime());
