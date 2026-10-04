@@ -3,15 +3,50 @@
 #include "Gui.h"
 #include "Items.h"
 
+#include "raymath.h"
+
+#include <algorithm>
 #include <cmath>
 #include <string>
 
 namespace {
 
 constexpr int ITEM_SIZE = 16;
+// Minecraft's icon view: tilted 30 degrees down, looking at a corner (45 degrees).
+constexpr float ICON_PITCH = 30.0f * DEG2RAD, ICON_YAW = 45.0f * DEG2RAD;
 
 int IconKey(const ItemStack& stack) {
     return stack.id | (stack.damage & 15) << 8;
+}
+
+// 1.21's lighting for blocks in GUIs (Lighting.setupFor3DItems, and
+// minecraft_mix_light in the item shaders): two fixed lights, each adding 60% of
+// its diffuse to a 40% ambient, capped at full. The lights are DIFFUSE_LIGHT_0
+// (0.2, 1, -0.7) and DIFFUSE_LIGHT_1 (-0.2, 1, 0.7) turned into the GUI's view
+// (135 degrees about X, -22.5 about Y, then Y flipped), here expressed in the
+// icon camera's frame. The top, left (south) and right (east) faces come out as
+// in 1.21, 100%, 81% and 62%; every other face goes by its own direction.
+float GuiShade(Vector3 normal) {
+    struct Lights { Vector3 a, b; };
+    static const Lights lights = [] {
+        auto toView = [](Vector3 l) {
+            l = Vector3Normalize(l);
+            const float ax = 2.3561945f, ay = -0.3926991f;
+            Vector3 x = { l.x, l.y * cosf(ax) - l.z * sinf(ax), l.y * sinf(ax) + l.z * cosf(ax) };
+            Vector3 y = { x.x * cosf(ay) + x.z * sinf(ay), x.y, -x.x * sinf(ay) + x.z * cosf(ay) };
+            return Vector3{ y.x, -y.y, y.z };
+        };
+        // The view's axes in block space: right, up, and back toward the viewer.
+        Vector3 back = { cosf(ICON_PITCH) * sinf(ICON_YAW), sinf(ICON_PITCH), cosf(ICON_PITCH) * cosf(ICON_YAW) };
+        Vector3 right = { cosf(ICON_YAW), 0.0f, -sinf(ICON_YAW) };
+        Vector3 up = Vector3CrossProduct(back, right);
+        auto toBlock = [&](Vector3 v) {
+            return Vector3Add(Vector3Add(Vector3Scale(right, v.x), Vector3Scale(up, v.y)), Vector3Scale(back, v.z));
+        };
+        return Lights{ toBlock(toView(Vector3{ 0.2f, 1.0f, -0.7f })), toBlock(toView(Vector3{ -0.2f, 1.0f, 0.7f })) };
+    }();
+    float diffuse = std::max(0.0f, Vector3DotProduct(lights.a, normal)) + std::max(0.0f, Vector3DotProduct(lights.b, normal));
+    return std::min(1.0f, diffuse * 0.6f + 0.4f);
 }
 
 } // namespace
@@ -46,11 +81,10 @@ void ItemIcons::Prepare() {
     }
     if (pending.empty()) return;
 
-    // Minecraft's icon view: tilted 30 degrees down, looking at a corner (45 degrees).
     Camera3D camera = { 0 };
     camera.target = Vector3{ 0.5f, 0.5f, 0.5f };
-    float pitch = 30.0f * DEG2RAD, yaw = 45.0f * DEG2RAD;
-    camera.position = Vector3{ 0.5f + cosf(pitch) * sinf(yaw) * 4.0f, 0.5f + sinf(pitch) * 4.0f, 0.5f + cosf(pitch) * cosf(yaw) * 4.0f };
+    camera.position = Vector3{ 0.5f + cosf(ICON_PITCH) * sinf(ICON_YAW) * 4.0f, 0.5f + sinf(ICON_PITCH) * 4.0f,
+                               0.5f + cosf(ICON_PITCH) * cosf(ICON_YAW) * 4.0f };
     camera.up = Vector3{ 0.0f, 1.0f, 0.0f };
     camera.fovy = 1.62f; // view height in blocks; the cube's outline is ~1.57 tall and ~1.41 wide
     camera.projection = CAMERA_ORTHOGRAPHIC;
@@ -59,7 +93,7 @@ void ItemIcons::Prepare() {
     Material material = MakeMaterial(shader, models.Atlas());
     for (int key : pending) {
         int id = key & 0xFF, meta = key >> 8;
-        Mesh mesh = BuildBlockTerrainMesh(id, ItemRenderMeta(ItemStack(id, 1, meta)));
+        Mesh mesh = BuildBlockTerrainMesh(id, ItemRenderMeta(ItemStack(id, 1, meta)), GuiShade);
         RenderTexture2D target = LoadRenderTexture(size, size);
         SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
         BeginTextureMode(target);

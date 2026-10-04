@@ -1107,7 +1107,9 @@ struct MeshBuffer {
 class ChunkSink final : public QuadSink {
 public:
     MeshBuffer opaque, translucent;
-    void Quad(const BlockVertex v[4], Vector3, Layer layer, float shade) override {
+    float (*shadeByNormal)(Vector3) = nullptr; // replaces the per-side shade when set
+    void Quad(const BlockVertex v[4], Vector3 normal, Layer layer, float shade) override {
+        if (shadeByNormal != nullptr) shade = shadeByNormal(normal);
         (layer == Layer::Translucent ? translucent : opaque).Add(v, shade, false, Vector2{ 0, 0 });
     }
 };
@@ -1248,8 +1250,9 @@ void RenderBlockModel(QuadSink& sink, int id, int meta, Vector3 offset, float sk
     Render(c);
 }
 
-Mesh BuildBlockTerrainMesh(int id, int meta) {
+Mesh BuildBlockTerrainMesh(int id, int meta, float (*shade)(Vector3 normal)) {
     ChunkSink sink;
+    sink.shadeByNormal = shade;
     RenderBlockModel(sink, id, meta, Vector3{ 0, 0, 0 });
     MeshBuffer& all = sink.opaque;
     const MeshBuffer& t = sink.translucent;

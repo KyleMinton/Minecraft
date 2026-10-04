@@ -35,8 +35,9 @@ void RenderWorldBlock(QuadSink& sink, const World& world, int x, int y, int z, V
 void RenderBlockModel(QuadSink& sink, int id, int meta, Vector3 offset, float sky = 15, float glow = 0);
 
 // The block (id, meta) as a terrain-shader mesh in the unit cell at the origin,
-// fully lit (inventory icons).
-Mesh BuildBlockTerrainMesh(int id, int meta);
+// fully lit (inventory icons). With `shade`, each face is shaded by
+// shade(its normal) instead of the world's fixed per-side shading.
+Mesh BuildBlockTerrainMesh(int id, int meta, float (*shade)(Vector3 normal) = nullptr);
 
 // A chunk's meshes: full opaque cubes greedy-merged, everything else block by block.
 ChunkMeshes BuildChunkMeshes(const World& world, const Chunk& chunk);
