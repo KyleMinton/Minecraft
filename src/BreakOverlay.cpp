@@ -1,4 +1,5 @@
 #include "BreakOverlay.h"
+#include "Block.h"
 
 #include "raymath.h"
 #include "rlgl.h"
@@ -67,7 +68,7 @@ BreakOverlay::BreakOverlay() {
     std::vector<std::pair<int, int>> crackPixels = CrackPixels();
     // Beta's cracks are terrain.png tiles 240-249.
     Image terrain = LoadImage("resources/textures/terrain.png");
-    bool haveTerrain = terrain.data != nullptr && terrain.width == 256;
+    bool haveTerrain = terrain.data != nullptr && terrain.width == ATLAS_TILES * 16;
     if (haveTerrain) ImageFormat(&terrain, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     for (int i = 0; i < STAGE_COUNT; i++) {
         if (haveTerrain) {
@@ -75,7 +76,7 @@ BreakOverlay::BreakOverlay() {
             // result = 2 x crack x block), so mid-gray changes nothing. Make the
             // see-through pixels mid-gray so only the cracks show.
             int tile = 240 + i;
-            Image image = ImageFromImage(terrain, Rectangle{ (float)((tile & 15) * 16), (float)((tile >> 4) * 16), 16.0f, 16.0f });
+            Image image = ImageFromImage(terrain, Rectangle{ (float)(TileColumn(tile) * 16), (float)(TileRow(tile) * 16), 16.0f, 16.0f });
             Color* pixels = (Color*)image.data;
             for (int p = 0; p < image.width * image.height; p++) {
                 float a = pixels[p].a / 255.0f;

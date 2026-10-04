@@ -135,8 +135,14 @@ enum BlockType : BlockId {
     BLOCK_COUNT = 110
 };
 
-// Beta's terrain.png: a 16x16 grid of 16px tiles; a texture is tile index row * 16 + col.
-constexpr int ATLAS_TILES = 16;
+// terrain.png: a 64x64 grid of 16px tiles. Beta's tile numbers (0-255) keep
+// Beta's 16x16 layout in its top-left corner (tile row * 16 + col); numbers from
+// 256 fill the rows below that, 64 to a row.
+constexpr int ATLAS_TILES = 64;
+constexpr int LEGACY_TILES = 256;
+constexpr int MAX_TILE = LEGACY_TILES + (ATLAS_TILES - 16) * ATLAS_TILES;
+inline int TileColumn(int tile) { return tile < LEGACY_TILES ? (tile & 15) : (tile - LEGACY_TILES) % ATLAS_TILES; }
+inline int TileRow(int tile) { return tile < LEGACY_TILES ? (tile >> 4) : 16 + (tile - LEGACY_TILES) / ATLAS_TILES; }
 
 // Minecraft's side numbering: 0 down (-Y), 1 up (+Y), 2 north (-Z), 3 south (+Z),
 // 4 west (-X), 5 east (+X).

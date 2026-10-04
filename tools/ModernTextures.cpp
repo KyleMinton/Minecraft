@@ -111,20 +111,36 @@ void CopyFile(const std::string& fromRel, const std::string& toRel) {
 
 // ---- Atlases
 
-// An atlas of 16x16 cells; the existing file's tiles are the starting point.
+// terrain.png's layout (the game's TileColumn/TileRow in Block.h): 64 tiles
+// across; Beta's numbers 0-255 in a 16x16 block at the top left, numbers from
+// 256 in the rows below, 64 to a row.
+constexpr int TERRAIN_TILES = 64, LEGACY_TILES = 256;
+int TerrainColumn(int tile) { return tile < LEGACY_TILES ? (tile & 15) : (tile - LEGACY_TILES) % TERRAIN_TILES; }
+int TerrainRow(int tile) { return tile < LEGACY_TILES ? (tile >> 4) : 16 + (tile - LEGACY_TILES) / TERRAIN_TILES; }
+
+// An atlas of cells; the existing file's tiles are the starting point. A smaller
+// existing file (Beta's 16x16-tile terrain.png) goes in the top-left corner.
 struct Atlas {
     Image image;
     int cell;
-    Atlas(const std::string& rel, int size, int cellSize) : cell(cellSize) {
+    bool terrain; // terrain.png's numbering; otherwise 16 cells to a row
+    Atlas(const std::string& rel, int size, int cellSize, bool terrainLayout = false) : cell(cellSize), terrain(terrainLayout) {
         std::string path = g_resources + "/" + rel;
-        image = FileExists(path.c_str()) ? Load(path) : GenImageColor(size, size, BLANK);
-        if (image.width != size || image.height != size) ImageResizeNN(&image, size, size);
+        image = GenImageColor(size, size, BLANK);
+        if (FileExists(path.c_str())) {
+            Image old = Load(path);
+            if (old.width > size || old.height > size) ImageResizeNN(&old, size, size);
+            CopyAll(old, image, 0, 0);
+            UnloadImage(old);
+        }
     }
+    int X(int index) const { return (terrain ? TerrainColumn(index) : index % 16) * cell; }
+    int Y(int index) const { return (terrain ? TerrainRow(index) : index / 16) * cell; }
     // Replaces cell `index` with `tile` (scaled to the cell size if it isn't).
     void Put(int index, Image tile) {
         if (tile.data == nullptr) return;
         if (tile.width != cell || tile.height != cell) ImageResizeNN(&tile, cell, cell);
-        int x = (index % 16) * cell, y = (index / 16) * cell;
+        int x = X(index), y = Y(index);
         for (int j = 0; j < cell; j++)
             for (int i = 0; i < cell; i++) Pixels(image)[(y + j) * image.width + x + i] = BLANK;
         CopyAll(tile, image, x, y);
@@ -134,7 +150,7 @@ struct Atlas {
     void PutSpan(int index, Image tile, int cells) {
         if (tile.data == nullptr) return;
         if (tile.width != cell * cells) ImageResizeNN(&tile, cell * cells, cell * cells);
-        CopyAll(tile, image, (index % 16) * cell, (index / 16) * cell);
+        CopyAll(tile, image, X(index), Y(index));
         UnloadImage(tile);
     }
 };
@@ -276,7 +292,7 @@ void BuildChests() {
 }
 
 void BuildTerrain() {
-    Atlas terrain("textures/terrain.png", 256, 16);
+    Atlas terrain("textures/terrain.png", TERRAIN_TILES * 16, 16, true);
     for (const Named& t : TERRAIN) terrain.Put(t.index, Block(t.name));
 
     // Redstone dust: Beta has a cross (164) and a line along U (165); 1.21 draws

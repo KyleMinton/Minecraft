@@ -1,4 +1,5 @@
 #include "TextureFX.h"
+#include "Block.h"
 
 #include <algorithm>
 #include <cctype>
@@ -67,7 +68,7 @@ TextureFX::~TextureFX() {
 // Without its strip (or with a terrain.png that isn't 16px tiles) a tile just
 // keeps the still image it has in the atlas.
 void TextureFX::Load(const std::string& name, int tile) {
-    if (atlas.id == 0 || atlas.width != TILE_SIZE * 16) return;
+    if (atlas.id == 0 || atlas.width != TILE_SIZE * ATLAS_TILES) return;
     std::string path = "resources/textures/animated/" + name + ".png";
     if (!FileExists(path.c_str())) return;
     Animation a;
@@ -118,6 +119,6 @@ void TextureFX::Tick() {
 // The current frame into its tile(s): a 32px frame fills 2x2 tiles.
 void TextureFX::Upload(const Animation& a) const {
     const unsigned char* frame = (const unsigned char*)a.strip.data + (size_t)a.frames[a.step] * a.size * a.size * 4;
-    Rectangle rect = { (float)((a.tile & 15) * TILE_SIZE), (float)((a.tile >> 4) * TILE_SIZE), (float)a.size, (float)a.size };
+    Rectangle rect = { (float)(TileColumn(a.tile) * TILE_SIZE), (float)(TileRow(a.tile) * TILE_SIZE), (float)a.size, (float)a.size };
     UpdateTextureRec(atlas, rect, frame);
 }

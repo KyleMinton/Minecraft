@@ -43,4 +43,5 @@ Mesh BuildBlockTerrainMesh(int id, int meta, float (*shade)(Vector3 normal) = nu
 ChunkMeshes BuildChunkMeshes(const World& world, const Chunk& chunk);
 
 // A tile's top-left in terrain.png UV space.
-inline Vector2 TileUV(int tile) { return Vector2{ (tile & 15) / 16.0f, (tile >> 4) / 16.0f }; }
+constexpr float TILE_UV = 1.0f / ATLAS_TILES; // one tile's width (and height) in terrain.png's UVs
+inline Vector2 TileUV(int tile) { return Vector2{ TileColumn(tile) * TILE_UV, TileRow(tile) * TILE_UV }; }

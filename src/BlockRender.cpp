@@ -24,7 +24,7 @@ BlockBox MakeBoxLocal(float x0, float y0, float z0, float x1, float y1, float z1
 }
 
 constexpr float AO_CURVE[4] = { 0.45f, 0.65f, 0.8f, 1.0f };
-constexpr float PX = 1.0f / 256.0f; // one texel of terrain.png
+constexpr float PX = TILE_UV / 16.0f; // one texel of terrain.png
 
 // ---- Directions (Minecraft sides used as directions: 0 -Y, 1 +Y, 2 -Z, 3 +Z, 4 -X, 5 +X)
 
@@ -204,8 +204,8 @@ void EmitBoxFace(Ctx& c, const BlockBox& b, int side, const FaceStyle& style, La
         v[k].x = c.off.x + p[0];
         v[k].y = c.off.y + p[1];
         v[k].z = c.off.z + p[2];
-        v[k].u = tile.x + u / 16.0f;
-        v[k].v = tile.y + vv / 16.0f;
+        v[k].u = tile.x + u * TILE_UV;
+        v[k].v = tile.y + vv * TILE_UV;
     }
 
     // Lighting: smooth with AO where the face lies on the cell's boundary, else flat.
@@ -287,10 +287,10 @@ void FreeQuad(Ctx& c, const Vector3 p[4], const Vector2 uv[4], Color tint, Layer
 // The whole tile over a quad whose corners run top-left, bottom-left, bottom-right, top-right.
 void TileCorners(int tex, Vector2 uv[4], float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1) {
     Vector2 t = TileUV(tex);
-    uv[0] = { t.x + u0 / 16.0f, t.y + v0 / 16.0f };
-    uv[1] = { t.x + u0 / 16.0f, t.y + v1 / 16.0f };
-    uv[2] = { t.x + u1 / 16.0f, t.y + v1 / 16.0f };
-    uv[3] = { t.x + u1 / 16.0f, t.y + v0 / 16.0f };
+    uv[0] = { t.x + u0 * TILE_UV, t.y + v0 * TILE_UV };
+    uv[1] = { t.x + u0 * TILE_UV, t.y + v1 * TILE_UV };
+    uv[2] = { t.x + u1 * TILE_UV, t.y + v1 * TILE_UV };
+    uv[3] = { t.x + u1 * TILE_UV, t.y + v0 * TILE_UV };
 }
 
 // RenderBlocks.renderCrossedSquares
@@ -539,7 +539,7 @@ void RenderWire(Ctx& c) {
         }
         Vector2 t = TileUV(164);
         Vector3 p[4] = { { x0, h, z0 }, { x0, h, z1 }, { x1, h, z1 }, { x1, h, z0 } };
-        Vector2 uv[4] = { { t.x + x0 / 16, t.y + z0 / 16 }, { t.x + x0 / 16, t.y + z1 / 16 }, { t.x + x1 / 16, t.y + z1 / 16 }, { t.x + x1 / 16, t.y + z0 / 16 } };
+        Vector2 uv[4] = { { t.x + x0 * TILE_UV, t.y + z0 * TILE_UV }, { t.x + x0 * TILE_UV, t.y + z1 * TILE_UV }, { t.x + x1 * TILE_UV, t.y + z1 * TILE_UV }, { t.x + x1 * TILE_UV, t.y + z0 * TILE_UV } };
         FreeQuad(c, p, uv, tint, Layer::Cutout, false, light);
     } else {
         Vector2 t = TileUV(165);
@@ -547,9 +547,9 @@ void RenderWire(Ctx& c) {
         // The line runs along the texture's U; turn it to run north-south if needed.
         Vector2 uv[4];
         if (type == 1) {
-            uv[0] = { t.x, t.y }; uv[1] = { t.x, t.y + 1 / 16.0f }; uv[2] = { t.x + 1 / 16.0f, t.y + 1 / 16.0f }; uv[3] = { t.x + 1 / 16.0f, t.y };
+            uv[0] = { t.x, t.y }; uv[1] = { t.x, t.y + TILE_UV }; uv[2] = { t.x + TILE_UV, t.y + TILE_UV }; uv[3] = { t.x + TILE_UV, t.y };
         } else {
-            uv[0] = { t.x, t.y + 1 / 16.0f }; uv[1] = { t.x + 1 / 16.0f, t.y + 1 / 16.0f }; uv[2] = { t.x + 1 / 16.0f, t.y }; uv[3] = { t.x, t.y };
+            uv[0] = { t.x, t.y + TILE_UV }; uv[1] = { t.x + TILE_UV, t.y + TILE_UV }; uv[2] = { t.x + TILE_UV, t.y }; uv[3] = { t.x, t.y };
         }
         FreeQuad(c, p, uv, tint, Layer::Cutout, false, light);
     }
@@ -557,7 +557,7 @@ void RenderWire(Ctx& c) {
     // Up the side of a block to wire on top of it.
     Vector2 t = TileUV(165);
     const float in = 0.015625f;
-    Vector2 vuv[4] = { { t.x + 1 / 16.0f, t.y }, { t.x, t.y }, { t.x, t.y + 1 / 16.0f }, { t.x + 1 / 16.0f, t.y + 1 / 16.0f } };
+    Vector2 vuv[4] = { { t.x + TILE_UV, t.y }, { t.x, t.y }, { t.x, t.y + TILE_UV }, { t.x + TILE_UV, t.y + TILE_UV } };
     if (upW) { Vector3 p[4] = { { in, 1, 1 }, { in, 0, 1 }, { in, 0, 0 }, { in, 1, 0 } }; FreeQuad(c, p, vuv, tint, Layer::Cutout, true, light); }
     if (upE) { Vector3 p[4] = { { 1 - in, 1, 0 }, { 1 - in, 0, 0 }, { 1 - in, 0, 1 }, { 1 - in, 1, 1 } }; FreeQuad(c, p, vuv, tint, Layer::Cutout, true, light); }
     if (upN) { Vector3 p[4] = { { 0, 1, in }, { 0, 0, in }, { 1, 0, in }, { 1, 1, in } }; FreeQuad(c, p, vuv, tint, Layer::Cutout, true, light); }
@@ -950,21 +950,21 @@ void RenderPane(Ctx& c) {
 
     auto planeX = [&](float x0, float x1) { // a plane along X at z = 0.5
         Vector3 p[4] = { { x0, 1, 0.5f }, { x0, 0, 0.5f }, { x1, 0, 0.5f }, { x1, 1, 0.5f } };
-        Vector2 uv[4] = { { t.x + x0 / 16, t.y }, { t.x + x0 / 16, t.y + 1 / 16.0f }, { t.x + x1 / 16, t.y + 1 / 16.0f }, { t.x + x1 / 16, t.y } };
+        Vector2 uv[4] = { { t.x + x0 * TILE_UV, t.y }, { t.x + x0 * TILE_UV, t.y + TILE_UV }, { t.x + x1 * TILE_UV, t.y + TILE_UV }, { t.x + x1 * TILE_UV, t.y } };
         FreeQuad(c, p, uv, WHITE, Layer::Cutout, true, light);
         for (float y : { 0.0f, 1.0f }) {
             Vector3 q[4] = { { x0, y, 0.4375f }, { x0, y, 0.5625f }, { x1, y, 0.5625f }, { x1, y, 0.4375f } };
-            Vector2 quv[4] = { { te.x + 7 * PX, te.y + x0 / 16 }, { te.x + 9 * PX, te.y + x0 / 16 }, { te.x + 9 * PX, te.y + x1 / 16 }, { te.x + 7 * PX, te.y + x1 / 16 } };
+            Vector2 quv[4] = { { te.x + 7 * PX, te.y + x0 * TILE_UV }, { te.x + 9 * PX, te.y + x0 * TILE_UV }, { te.x + 9 * PX, te.y + x1 * TILE_UV }, { te.x + 7 * PX, te.y + x1 * TILE_UV } };
             FreeQuad(c, q, quv, WHITE, Layer::Cutout, true, light);
         }
     };
     auto planeZ = [&](float z0, float z1) { // a plane along Z at x = 0.5
         Vector3 p[4] = { { 0.5f, 1, z1 }, { 0.5f, 0, z1 }, { 0.5f, 0, z0 }, { 0.5f, 1, z0 } };
-        Vector2 uv[4] = { { t.x + (1 - z1) / 16, t.y }, { t.x + (1 - z1) / 16, t.y + 1 / 16.0f }, { t.x + (1 - z0) / 16, t.y + 1 / 16.0f }, { t.x + (1 - z0) / 16, t.y } };
+        Vector2 uv[4] = { { t.x + (1 - z1) * TILE_UV, t.y }, { t.x + (1 - z1) * TILE_UV, t.y + TILE_UV }, { t.x + (1 - z0) * TILE_UV, t.y + TILE_UV }, { t.x + (1 - z0) * TILE_UV, t.y } };
         FreeQuad(c, p, uv, WHITE, Layer::Cutout, true, light);
         for (float y : { 0.0f, 1.0f }) {
             Vector3 q[4] = { { 0.4375f, y, z0 }, { 0.4375f, y, z1 }, { 0.5625f, y, z1 }, { 0.5625f, y, z0 } };
-            Vector2 quv[4] = { { te.x + 7 * PX, te.y + z0 / 16 }, { te.x + 7 * PX, te.y + z1 / 16 }, { te.x + 9 * PX, te.y + z1 / 16 }, { te.x + 9 * PX, te.y + z0 / 16 } };
+            Vector2 quv[4] = { { te.x + 7 * PX, te.y + z0 * TILE_UV }, { te.x + 7 * PX, te.y + z1 * TILE_UV }, { te.x + 9 * PX, te.y + z1 * TILE_UV }, { te.x + 9 * PX, te.y + z0 * TILE_UV } };
             FreeQuad(c, q, quv, WHITE, Layer::Cutout, true, light);
         }
     };

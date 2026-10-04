@@ -178,7 +178,8 @@ Texture2D ItemModels::Sheet(const ItemStack& stack) const {
 Rectangle ItemModels::IconUV(const ItemStack& stack) const {
     const ItemDef* def = GetItemDef(stack.id);
     int icon = def != nullptr ? def->Icon(stack.damage) : 0;
-    return Rectangle{ (icon & 15) / 16.0f, (icon >> 4) / 16.0f, 1.0f / 16.0f, 1.0f / 16.0f };
+    if (def != nullptr && def->Sheet() == IconSheet::Items) return Rectangle{ (icon & 15) / 16.0f, (icon >> 4) / 16.0f, 1.0f / 16.0f, 1.0f / 16.0f };
+    return Rectangle{ (float)TileColumn(icon) / ATLAS_TILES, (float)TileRow(icon) / ATLAS_TILES, 1.0f / ATLAS_TILES, 1.0f / ATLAS_TILES };
 }
 
 Color ItemModels::Tint(const ItemStack& stack) const {

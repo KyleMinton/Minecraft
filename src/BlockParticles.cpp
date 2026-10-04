@@ -71,9 +71,9 @@ BlockParticles::Particle BlockParticles::MakeDigging(const World& world, double 
 
     const Block& def = GetBlockDef(block);
     int tex = block == BLOCK_GRASS ? 2 : def.Texture(SIDE_NORTH, meta);
-    Vector2 t = { (tex & 15) / 16.0f, (tex >> 4) / 16.0f };
-    p.u = t.x + RandomFloat() * 3.0f / GRID / 16.0f;
-    p.v = t.y + RandomFloat() * 3.0f / GRID / 16.0f;
+    Vector2 t = { (float)TileColumn(tex) / ATLAS_TILES, (float)TileRow(tex) / ATLAS_TILES };
+    p.u = t.x + RandomFloat() * 3.0f / GRID / ATLAS_TILES;
+    p.v = t.y + RandomFloat() * 3.0f / GRID / ATLAS_TILES;
     p.tint = block == BLOCK_GRASS ? WHITE : def.WorldTint(world, bx, by, bz, SIDE_NORTH);
     return p;
 }
@@ -401,7 +401,7 @@ void BlockParticles::DrawBatch(const Camera3D& camera, const World& world, bool 
         };
         float u0, v0, u1, v1;
         if (digging) {
-            u0 = p.u; v0 = p.v; u1 = p.u + PIECE / 16.0f; v1 = p.v + PIECE / 16.0f;
+            u0 = p.u; v0 = p.v; u1 = p.u + PIECE / ATLAS_TILES; v1 = p.v + PIECE / ATLAS_TILES;
         } else {
             u0 = (p.texture % 16) / 16.0f; v0 = (p.texture / 16) / 16.0f;
             u1 = u0 + 1.0f / 16.0f; v1 = v0 + 1.0f / 16.0f;
