@@ -46,6 +46,8 @@ public:
         return (above == BlockMaterial::Snow || above == BlockMaterial::BuiltSnow) ? 68 : 3;
     }
     Color ItemTint(int meta) const override { return GRASS_ITEM_COLOR; }
+    // The sides are dirt; their green fringe is the overlay RenderCube adds.
+    Color ItemFaceTint(int meta, int side) const override { return side == SIDE_UP ? GRASS_ITEM_COLOR : WHITE; }
     Color WorldTint(const World& world, int x, int y, int z, int side) const override {
         return side == SIDE_UP ? GRASS_COLOR : WHITE;
     }

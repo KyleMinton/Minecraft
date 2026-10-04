@@ -204,6 +204,8 @@ public:
     // (grass with snow on it, double chests, piston state).
     virtual int WorldTexture(const World& world, int x, int y, int z, int side) const;
     virtual Color ItemTint(int meta) const { return WHITE; }
+    // The tint of one face of the block drawn as an item (grass colors only its top).
+    virtual Color ItemFaceTint(int meta, int side) const { return ItemTint(meta); }
     virtual Color WorldTint(const World& world, int x, int y, int z, int side) const;
     // Faces of this block next to (nx, ny, nz), which is on `side`, are drawn unless hidden.
     virtual bool ShouldSideBeRendered(const World& world, int nx, int ny, int nz, int side) const;

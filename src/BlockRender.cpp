@@ -165,7 +165,7 @@ struct Ctx {
     bool Opaque(int dx, int dy, int dz) const { return world && world->IsOpaqueCube(x + dx, y + dy, z + dz); }
     bool Normal(int dx, int dy, int dz) const { return world && world->IsNormalCube(x + dx, y + dy, z + dz); }
     int Tex(int side) const { return world ? def.WorldTexture(*world, x, y, z, side) : def.Texture(side, meta); }
-    Color Tint(int side) const { return world ? def.WorldTint(*world, x, y, z, side) : def.ItemTint(meta); }
+    Color Tint(int side) const { return world ? def.WorldTint(*world, x, y, z, side) : def.ItemFaceTint(meta, side); }
     BlockBox Bounds() const { return world ? def.Bounds(*world, x, y, z) : def.ItemBounds(meta); }
     // The light for parts of the block not on a face of its cell (plants, torches...).
     Light2 Own() const { return world ? RenderLight(*world, x, y, z) : flat; }

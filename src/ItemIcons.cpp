@@ -23,18 +23,20 @@ int IconKey(const ItemStack& stack) {
 // minecraft_mix_light in the item shaders): two fixed lights, each adding 60% of
 // its diffuse to a 40% ambient, capped at full. The lights are DIFFUSE_LIGHT_0
 // (0.2, 1, -0.7) and DIFFUSE_LIGHT_1 (-0.2, 1, 0.7) turned into the GUI's view
-// (135 degrees about X, -22.5 about Y, then Y flipped), here expressed in the
-// icon camera's frame. The top, left (south) and right (east) faces come out as
-// in 1.21, 100%, 81% and 62%; every other face goes by its own direction.
+// (RenderSystem.setupGui3DDiffuseLighting's rotations, in a view with Y up),
+// here expressed in the icon camera's frame. The top, left (south) and right
+// (east) faces come out as in 1.21, 100%, 65% and 40%; every other face goes by
+// its own direction.
 float GuiShade(Vector3 normal) {
     struct Lights { Vector3 a, b; };
     static const Lights lights = [] {
-        auto toView = [](Vector3 l) {
-            l = Vector3Normalize(l);
-            const float ax = 2.3561945f, ay = -0.3926991f;
-            Vector3 x = { l.x, l.y * cosf(ax) - l.z * sinf(ax), l.y * sinf(ax) + l.z * cosf(ax) };
-            Vector3 y = { x.x * cosf(ay) + x.z * sinf(ay), x.y, -x.x * sinf(ay) + x.z * cosf(ay) };
-            return Vector3{ y.x, -y.y, y.z };
+        auto rotX = [](Vector3 v, float a) { return Vector3{ v.x, v.y * cosf(a) - v.z * sinf(a), v.y * sinf(a) + v.z * cosf(a) }; };
+        auto rotY = [](Vector3 v, float a) { return Vector3{ v.x * cosf(a) + v.z * sinf(a), v.y, -v.x * sinf(a) + v.z * cosf(a) }; };
+        auto toView = [&](Vector3 l) {
+            l = rotX(Vector3Normalize(l), 2.3561945f);
+            l = rotY(l, -0.3926991f);
+            l = rotX(l, 3.2375858f);
+            return rotY(l, 1.0821041f);
         };
         // The view's axes in block space: right, up, and back toward the viewer.
         Vector3 back = { cosf(ICON_PITCH) * sinf(ICON_YAW), sinf(ICON_PITCH), cosf(ICON_PITCH) * cosf(ICON_YAW) };
